@@ -111,11 +111,17 @@ public static partial class BBG
             return deleted;
         }
 
-        private static FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
+        private static unsafe FramebufferRessorce CreateFramebuffer(in FramebufferDesc framebufferDesc)
         {
             FramebufferRessorce newFramebuffer = new FramebufferRessorce();
             newFramebuffer.FramebufferDesc = framebufferDesc;
+#if GL_HAS_DSA
             GL.CreateFramebuffers(1, ref newFramebuffer.GLResource);
+#else
+            GL.GenFramebuffers(1, ref newFramebuffer.GLResource);
+            // a name from GenFramebuffers is not an object until it is bound once
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, newFramebuffer.GLResource);
+#endif
 
             Span<ColorBuffer> drawBuffers = stackalloc ColorBuffer[MAX_COLOR_ATTACHMENTS];
             int numColorAttachments = 0;
@@ -123,7 +129,12 @@ public static partial class BBG
             {
                 ref readonly Attachment attachment = ref framebufferDesc.Attachments[i];
 
+#if GL_HAS_DSA
                 GL.NamedFramebufferTexture(newFramebuffer.GLResource, attachment.AttachmentPoint, attachment.Texture.ID, attachment.Level);
+#else
+                GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, newFramebuffer.GLResource);
+                GL.FramebufferTexture(FramebufferTarget.DrawFramebuffer, attachment.AttachmentPoint, attachment.Texture.ID, attachment.Level);
+#endif
 
                 if (IsColorAttachment(attachment.AttachmentPoint))
                 {
@@ -131,7 +142,15 @@ public static partial class BBG
                     numColorAttachments++;
                 }
             }
+#if GL_HAS_DSA
             GL.NamedFramebufferDrawBuffers(newFramebuffer.GLResource, numColorAttachments, ref drawBuffers[0]);
+#else
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, newFramebuffer.GLResource);
+            fixed (ColorBuffer* bufs = drawBuffers)
+            {
+                GL.DrawBuffers(numColorAttachments, (DrawBufferMode*)bufs);
+            }
+#endif
 
             return newFramebuffer;
         }

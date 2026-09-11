@@ -32,12 +32,16 @@ public static partial class BBG
 
         public static void TextureBarrier()
         {
+#if GL_HAS_TEXTURE_BARRIER
             GL.TextureBarrier();
+#endif
         }
 
         public static void MemoryBarrier(MemoryBarrierMask memoryBarrierMask)
         {
+#if GL_HAS_IMAGE_LOAD_STORE
             GL.MemoryBarrier((OpenTK.Graphics.OpenGL.MemoryBarrierMask)memoryBarrierMask);
+#endif
         }
 
         public static void UseShaderProgram(ShaderProgram shaderProgram)
@@ -49,7 +53,12 @@ public static partial class BBG
         {
             if (doIt)
             {
+#if GL_HAS_DSA
                 GL.BindTextureUnit((uint)unit, texture.ID);
+#else
+                GL.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                GL.BindTexture((TextureTarget)texture.TextureType, texture.ID);
+#endif
             }
             else
             {
@@ -59,17 +68,26 @@ public static partial class BBG
 
         public static void BindImageUnit(Texture texture, int unit, int level = 0, bool layered = false, int layer = 0)
         {
+#if GL_HAS_IMAGE_LOAD_STORE
             GL.BindImageTexture((uint)unit, texture.ID, level, layered, layer, BufferAccess.ReadWrite, (InternalFormat)texture.Format);
+#endif
         }
 
         public static void BindImageUnit(Texture texture, Texture.InternalFormat format, int unit, int level = 0, bool layered = false, int layer = 0)
         {
+#if GL_HAS_IMAGE_LOAD_STORE
             GL.BindImageTexture((uint)unit, texture.ID, level, layered, layer, BufferAccess.ReadWrite, (InternalFormat)format);
+#endif
         }
 
         public static void UnbindTextureUnit(int unit)
         {
+#if GL_HAS_DSA
             GL.BindTextureUnit((uint)unit, 0);
+#else
+            GL.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+#endif
         }
 
         public static void SetUniforms<T>(in T uniforms) where T : unmanaged

@@ -19,6 +19,7 @@ class TAAResolve : IDisposable
 
     public GpuSettings Settings;
 
+#if GL_HAS_COMPUTE_SHADER
     public BBG.Texture Result => (frame % 2 == 0) ? taaPing : taaPong;
     public BBG.Texture PrevResult => (frame % 2 == 0) ? taaPong : taaPing;
 
@@ -26,16 +27,28 @@ class TAAResolve : IDisposable
     private BBG.Texture taaPong;
     private readonly BBG.AbstractShaderProgram taaResolveProgram;
     private int frame;
+#else
+    public BBG.Texture Result;
+    public BBG.Texture PrevResult => Result;
+#endif
     public TAAResolve(Vector2i size, in GpuSettings settings)
     {
+#if GL_HAS_COMPUTE_SHADER
         taaResolveProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "TAAResolve/compute.glsl"));
 
         SetSize(size);
         Settings = settings;
+#else
+        BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn, "TAA Resolve needs compute shaders (GL_HAS_COMPUTE_SHADER); disabled in this build");
+        Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+        Result.Allocate(1, 1, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+        Settings = settings;
+#endif
     }
 
     public void Compute(BBG.Texture color)
     {
+#if GL_HAS_COMPUTE_SHADER
         frame++;
 
         BBG.Computing.Compute("Temporal Anti Aliasing", () =>
@@ -50,10 +63,12 @@ class TAAResolve : IDisposable
             BBG.Computing.Dispatch(MyMath.DivUp(Result.Width, 8), MyMath.DivUp(Result.Height, 8), 1);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
         });
+#endif
     }
 
     public void SetSize(Vector2i size)
     {
+#if GL_HAS_COMPUTE_SHADER
         if (taaPing != null) taaPing.Dispose();
         taaPing = new BBG.Texture(BBG.Texture.Type.Texture2D);
         taaPing.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
@@ -65,13 +80,18 @@ class TAAResolve : IDisposable
         taaPong.SetFilter(BBG.Sampler.MinFilter.Linear, BBG.Sampler.MagFilter.Linear);
         taaPong.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
         taaPong.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+#endif
     }
 
     public void Dispose()
     {
+#if GL_HAS_COMPUTE_SHADER
         taaPing.Dispose();
         taaPong.Dispose();
         taaResolveProgram.Dispose();
+#else
+        Result.Dispose();
+#endif
     }
 
     public static float GetRecommendedMipmapBias(int renderWidth, int displayWith)

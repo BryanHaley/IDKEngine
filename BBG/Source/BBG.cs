@@ -125,7 +125,11 @@ public static partial class BBG
 
         // bind dummy VAO as drawing without one is not allowed but possible
         int dummyVao = 0;
+#if GL_HAS_DSA
         GL.CreateVertexArrays(1, ref dummyVao);
+#else
+        GL.GenVertexArrays(1, ref dummyVao);
+#endif
         GL.BindVertexArray(dummyVao);
 
         // fix default settings

@@ -1,9 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <Import Project="..\GLProfiles.props" />
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>AnyCPU;x64;ARM64</Platforms>
     <AssemblyName>IDKEngine</AssemblyName>
     <RootNamespace>IDKEngine</RootNamespace>
     <Nullable>disable</Nullable>
@@ -25,8 +27,12 @@
     <UseSizeOptimizedLinq>true</UseSizeOptimizedLinq>
     <InvariantGlobalization>true</InvariantGlobalization>
 
+    <!-- macOS gives a thread a smaller stack than Windows and the BVH builder
+         recurses deeply enough to notice. 16 MB, in hex, as the runtime wants. -->
+    <ThreadDefaultStackSize Condition="!$([MSBuild]::IsOSPlatform('Windows'))">1000000</ThreadDefaultStackSize>
+
     <OptimizationPreference>Speed</OptimizationPreference> 
-    <IlcInstructionSet>avx2</IlcInstructionSet>
+    <IlcInstructionSet Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">avx2</IlcInstructionSet>
     <IlcDisableVxsort>true</IlcDisableVxsort>
     <IlcDehydrate>true</IlcDehydrate>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
@@ -76,6 +82,30 @@
   <ItemGroup>
     <ProjectReference Include="..\BBG\BBG.csproj" />
     <ProjectReference Include="..\BBLogger\BBLogger.csproj" />
+  </ItemGroup>
+
+  <!--
+    libktx and libmeshoptimizer have no macOS binary in their NuGet packages.
+    tools/build_macos_natives.sh builds them; if they are there, copy them next
+    to the executable and switch the features on.
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\NativeLibs\osx-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())')">
+    <None Include="$(MSBuildThisFileDirectory)..\NativeLibs\osx-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())\*.dylib">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <!--
+    Upstream runs from the project directory, where Resource/ is already beside
+    the binary. A macOS run starts the apphost out of bin/, so the tree has to be
+    copied next to it or every shader and model path misses.
+  -->
+  <ItemGroup>
+    <None Include="Resource\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Resource\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
 </Project>

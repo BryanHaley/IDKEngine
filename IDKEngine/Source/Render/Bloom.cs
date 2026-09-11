@@ -25,36 +25,62 @@ class Bloom : IDisposable
         set
         {
             _minusLods = value;
+#if GL_HAS_COMPUTE_SHADER
             // Multiply with 2 to get size of original src texture
             SetSize(new Vector2i(Result.Width, Result.Height) * 2);
+#endif
         }
     }
 
+#if GL_HAS_COMPUTE_SHADER
     private enum Stage : int
     {
         Downsample,
         Upsample,
     }
+#endif
 
     public GpuSettings Settings;
 
-    public BBG.Texture Result => upsampleTexture;
+    public BBG.Texture Result
+    {
+        get
+        {
+#if GL_HAS_COMPUTE_SHADER
+            return upsampleTexture;
+#else
+            return dummyTexture;
+#endif
+        }
+    }
 
+#if GL_HAS_COMPUTE_SHADER
     private BBG.Texture downscaleTexture;
     private BBG.Texture upsampleTexture;
     private readonly BBG.AbstractShaderProgram shaderProgram;
+#else
+    private BBG.Texture dummyTexture;
+#endif
     public Bloom(Vector2i size, in GpuSettings settings, int minusLods = 3)
     {
+#if GL_HAS_COMPUTE_SHADER
         shaderProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "Bloom/compute.glsl"));
 
         SetSize(size);
 
         MinusLods = minusLods;
         Settings = settings;
+#else
+        BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn, "Bloom needs compute shaders (GL_HAS_COMPUTE_SHADER); disabled in this build");
+        dummyTexture = new BBG.Texture(BBG.Texture.Type.Texture2D);
+        dummyTexture.Allocate(1, 1, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+        Settings = settings;
+#endif
     }
 
     public void Compute(BBG.Texture src)
     {
+#if GL_HAS_COMPUTE_SHADER
         BBG.Cmd.SetUniforms(Settings);
 
         BBG.Cmd.UseShaderProgram(shaderProgram);
@@ -124,10 +150,12 @@ class Bloom : IDisposable
                 });
             }
         }
+#endif
     }
 
     public void SetSize(Vector2i size)
     {
+#if GL_HAS_COMPUTE_SHADER
         size.X = (int)float.Ceiling(size.X / 2.0f);
         size.Y = (int)float.Ceiling(size.Y / 2.0f);
 
@@ -144,12 +172,17 @@ class Bloom : IDisposable
         upsampleTexture.SetFilter(BBG.Sampler.MinFilter.LinearMipmapNearest, BBG.Sampler.MagFilter.Linear);
         upsampleTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
         upsampleTexture.Allocate(size.X, size.Y, 1, BBG.Texture.InternalFormat.R16G16B16A16Float, levels - 1);
+#endif
     }
 
     public void Dispose()
     {
+#if GL_HAS_COMPUTE_SHADER
         downscaleTexture.Dispose();
         upsampleTexture.Dispose();
         shaderProgram.Dispose();
+#else
+        dummyTexture.Dispose();
+#endif
     }
 }

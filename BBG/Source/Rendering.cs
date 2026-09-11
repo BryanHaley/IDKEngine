@@ -359,12 +359,19 @@ public static partial class BBG
 
                         case AttachmentLoadOp.Clear:
                             Vector4 clearColor = colorAttachment.ClearColor;
+#if GL_HAS_DSA
                             GL.ClearNamedFramebufferfv(fbo, FboBufferType.Color, i, &clearColor.X);
+#else
+                            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, fbo);
+                            GL.ClearBufferfv(FboBufferType.Color, i, &clearColor.X);
+#endif
                             break;
 
                         case AttachmentLoadOp.DontCare:
                             FramebufferAttachment framebufferAttachment = FramebufferAttachment.ColorAttachment0 + (uint)i;
+#if GL_HAS_DSA && GL_HAS_INVALIDATE_SUBDATA
                             GL.InvalidateNamedFramebufferData(fbo, 1, ref framebufferAttachment);
+#endif
                             break;
                     }
 
@@ -391,17 +398,29 @@ public static partial class BBG
                     case AttachmentLoadOp.Clear:
                         if (hasDepthComponent)
                         {
+#if GL_HAS_DSA
                             GL.ClearNamedFramebufferfv(fbo, FboBufferType.Depth, 0, &depthStencilAttachment.DepthClearValue);
+#else
+                            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, fbo);
+                            GL.ClearBufferfv(FboBufferType.Depth, 0, &depthStencilAttachment.DepthClearValue);
+#endif
                         }
                         if (hasStencilComponent)
                         {
+#if GL_HAS_DSA
                             GL.ClearNamedFramebufferiv(fbo, FboBufferType.Stencil, 0, &depthStencilAttachment.StencilClearValue);
+#else
+                            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, fbo);
+                            GL.ClearBufferiv(FboBufferType.Stencil, 0, &depthStencilAttachment.StencilClearValue);
+#endif
                         }
                         break;
 
                     case AttachmentLoadOp.DontCare:
                         FramebufferAttachment attachment = FormatTypeToFboAttachment(formatType);
+#if GL_HAS_DSA && GL_HAS_INVALIDATE_SUBDATA
                         GL.InvalidateNamedFramebufferData(fbo, 1, ref attachment);
+#endif
 
                         break;
                 }
@@ -429,11 +448,21 @@ public static partial class BBG
 
             if (fboNoAttachmentsGLHandle == 0)
             {
+#if GL_HAS_DSA
                 GL.CreateFramebuffers(1, ref fboNoAttachmentsGLHandle);
+#else
+                GL.GenFramebuffers(1, ref fboNoAttachmentsGLHandle);
+#endif
             }
 
+#if GL_HAS_DSA
             GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
             GL.NamedFramebufferParameteri(fboNoAttachmentsGLHandle, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
+#else
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, fboNoAttachmentsGLHandle);
+            GL.FramebufferParameteri(FramebufferTarget.DrawFramebuffer, FramebufferParameterName.FramebufferDefaultWidth, fboParameters.Width);
+            GL.FramebufferParameteri(FramebufferTarget.DrawFramebuffer, FramebufferParameterName.FramebufferDefaultHeight, fboParameters.Height);
+#endif
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fboNoAttachmentsGLHandle);
             SetGraphicsPipelineState(pipelineState);
@@ -451,34 +480,76 @@ public static partial class BBG
 
             int fbo = FramebufferCache.GetFramebuffer(desc);
 
+#if GL_HAS_DSA
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+#else
+            GL.BindFramebuffer(FramebufferTarget.ReadFramebuffer, fbo);
+            GL.BindFramebuffer(FramebufferTarget.DrawFramebuffer, 0);
+            GL.BlitFramebuffer(0, 0, texture.Width, texture.Height, 0, 0, texture.Width, texture.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+#endif
         }
 
         public static void SetVertexInputDesc(in VertexInputDesc vertexInputDesc)
         {
             GL.DeleteVertexArrays(1, ref vaoGLHandle);
+#if GL_HAS_DSA
             GL.CreateVertexArrays(1, ref vaoGLHandle);
 
             GL.VertexArrayElementBuffer(vaoGLHandle, vertexInputDesc.IndexBuffer.ID);
+#else
+            GL.GenVertexArrays(1, ref vaoGLHandle);
+            // everything below acts on the bound VAO instead of naming it
+            GL.BindVertexArray(vaoGLHandle);
+            GL.BindBuffer(OpenTK.Graphics.OpenGL.BufferTarget.ElementArrayBuffer, vertexInputDesc.IndexBuffer.ID);
+#endif
 
             if (vertexInputDesc.VertexDescription.HasValue)
             {
                 VertexDescription vertexDescription = vertexInputDesc.VertexDescription.Value;
+#if GL_HAS_VERTEX_ATTRIB_BINDING
                 for (int i = 0; i < vertexDescription.VertexBuffers.Length; i++)
                 {
                     ref readonly VertexBuffer vertexBuffer = ref vertexDescription.VertexBuffers[i];
 
+#if GL_HAS_DSA
                     GL.VertexArrayVertexBuffer(vaoGLHandle, (uint)i, vertexBuffer.Buffer.ID, vertexBuffer.Offset, vertexBuffer.VertexSize);
+#else
+                    GL.BindVertexBuffer((uint)i, vertexBuffer.Buffer.ID, vertexBuffer.Offset, vertexBuffer.VertexSize);
+#endif
                 }
 
                 for (int i = 0; i < vertexDescription.VertexAttributes.Length; i++)
                 {
                     ref readonly VertexAttribute vertexAttribute = ref vertexDescription.VertexAttributes[i];
 
+#if GL_HAS_DSA
                     GL.EnableVertexArrayAttrib(vaoGLHandle, (uint)i);
                     GL.VertexArrayAttribFormat(vaoGLHandle, (uint)i, vertexAttribute.NumComponents, (VertexAttribType)vertexAttribute.Type, vertexAttribute.Normalize, (uint)vertexAttribute.RelativeOffset);
                     GL.VertexArrayAttribBinding(vaoGLHandle, (uint)i, (uint)vertexAttribute.BufferIndex);
+#else
+                    GL.EnableVertexAttribArray((uint)i);
+                    GL.VertexAttribFormat((uint)i, vertexAttribute.NumComponents, (VertexAttribType)vertexAttribute.Type, vertexAttribute.Normalize, (uint)vertexAttribute.RelativeOffset);
+                    GL.VertexAttribBinding((uint)i, (uint)vertexAttribute.BufferIndex);
+#endif
                 }
+#else
+                // Separating the format from the buffer is ARB_vertex_attrib_binding,
+                // core in 4.3. On 4.1 each attribute carries its own buffer and
+                // stride, so the two loops collapse into one.
+                for (int i = 0; i < vertexDescription.VertexAttributes.Length; i++)
+                {
+                    ref readonly VertexAttribute vertexAttribute = ref vertexDescription.VertexAttributes[i];
+                    ref readonly VertexBuffer vertexBuffer = ref vertexDescription.VertexBuffers[vertexAttribute.BufferIndex];
+
+                    GL.BindBuffer(OpenTK.Graphics.OpenGL.BufferTarget.ArrayBuffer, vertexBuffer.Buffer.ID);
+                    GL.EnableVertexAttribArray((uint)i);
+                    GL.VertexAttribPointer((uint)i, vertexAttribute.NumComponents,
+                                           (VertexAttribPointerType)vertexAttribute.Type,
+                                           vertexAttribute.Normalize,
+                                           vertexBuffer.VertexSize,
+                                           (nint)(vertexBuffer.Offset + vertexAttribute.RelativeOffset));
+                }
+#endif
             }
 
             GL.BindVertexArray(vaoGLHandle);
@@ -497,15 +568,23 @@ public static partial class BBG
         public static void MultiDrawNonIndexed(Buffer drawCommandBuffer, Topology topology, int drawCount, int stride, nint bufferOffset = 0)
         {
             if (drawCount == 0) return;
+#if GL_HAS_MULTI_DRAW_INDIRECT
             GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer.ID);
             GL.MultiDrawArraysIndirect((PrimitiveType)topology, bufferOffset, drawCount, stride);
+#else
+            WarnNoMultiDraw();
+#endif
         }
 
         public static void MultiDrawIndexed(Buffer drawCommandBuffer, Topology topology, IndexType indexType, int drawCount, int stride, nint bufferOffset = 0)
         {
             if (drawCount == 0) return;
+#if GL_HAS_MULTI_DRAW_INDIRECT
             GL.BindBuffer(BufferTarget.DrawIndirectBuffer, drawCommandBuffer.ID);
             GL.MultiDrawElementsIndirect((PrimitiveType)topology, (DrawElementsType)indexType, bufferOffset, drawCount, stride);
+#else
+            WarnNoMultiDraw();
+#endif
         }
 
         /// <summary>
@@ -515,10 +594,36 @@ public static partial class BBG
         /// <param name=""></param>
         public static void MultiDrawMeshletsCountNV(Buffer meshletTasksCmdsBuffer, Buffer meshletTasksCountBuffer, int maxMeshlets, int stride, nint meshletCmdOffset = 0, nint taskCountOffset = 0)
         {
+#if GL_HAS_MESH_SHADER
             GL.BindBuffer(BufferTarget.DrawIndirectBuffer, meshletTasksCmdsBuffer.ID);
             GL.BindBuffer(BufferTarget.ParameterBuffer, meshletTasksCountBuffer.ID);
             GL.NV.MultiDrawMeshTasksIndirectCountNV(meshletCmdOffset, taskCountOffset, maxMeshlets, stride);
+#endif
         }
+
+
+#if !GL_HAS_MULTI_DRAW_INDIRECT
+        private static bool warnedMultiDraw;
+
+        private static void WarnNoMultiDraw()
+        {
+            if (warnedMultiDraw) return;
+            warnedMultiDraw = true;
+            BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn,
+                "Multi-draw indirect needs GL 4.3; those draws do nothing in this build");
+        }
+#endif
+#if !GL_HAS_CLIP_CONTROL
+        private static bool warnedClipControl;
+
+        private static void WarnNoClipControl()
+        {
+            if (warnedClipControl) return;
+            warnedClipControl = true;
+            BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn,
+                "glClipControl needs GL 4.5; depth stays -1..1 and reverse-Z is off");
+        }
+#endif
 
         public static void InferViewportSize(int x = 0, int y = 0)
         {
@@ -569,7 +674,11 @@ public static partial class BBG
             }
 
             GL.DepthMask(pipelineState.EnableDepthWrites);
+#if GL_HAS_CLIP_CONTROL
             GL.ClipControl(ClipControlOrigin.LowerLeft, (ClipControlDepth)pipelineState.DepthConvention);
+#else
+            WarnNoClipControl();
+#endif
             GL.PolygonMode(OpenTK.Graphics.OpenGL.TriangleFace.FrontAndBack, (PolygonMode)pipelineState.FillMode);
             GL.DepthFunc((OpenTK.Graphics.OpenGL.DepthFunction)pipelineState.DepthFunction);
             GL.CullFace((OpenTK.Graphics.OpenGL.TriangleFace)pipelineState.CullFace);

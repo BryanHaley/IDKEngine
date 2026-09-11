@@ -49,12 +49,14 @@ class PathTracerPipeline : IDisposable
     {
         get
         {
+#if GL_HAS_COMPUTE_SHADER
             BBG.Texture result = PathTracerOutput switch
             {
                 OutputTexture.Noisy => pathTracer.Result,
                 OutputTexture.Denoised => denoisedTexture,
                 OutputTexture.Albedo => pathTracer.AlbedoTexture,
                 OutputTexture.Normal => pathTracer.NormalTexture,
+                _ => pathTracer.Result,
             };
 
             if (DoDebugBVHTraversal)
@@ -63,6 +65,9 @@ class PathTracerPipeline : IDisposable
             }
 
             return result;
+#else
+            return pathTracer.Result;
+#endif
         }
     }
 
@@ -164,6 +169,7 @@ class PathTracerPipeline : IDisposable
 
     public unsafe void Denoise()
     {
+#if HAS_OIDN && GL_HAS_COMPUTE_SHADER
         if (!OIDN.LibraryFound)
         {
             Logger.Log(Logger.LogLevel.Error, $"Tried to invoke Intel Denoiser but {OIDN.LIBRARY_NAME} was not found");
@@ -191,6 +197,9 @@ class PathTracerPipeline : IDisposable
         {
             PathTracerOutput = OutputTexture.Denoised;
         }
+#else
+        BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn, "Denoising needs OIDN native library (HAS_OIDN) and compute shaders; not available in this build");
+#endif
     }
 
     public void ResetAccumulation()

@@ -22,6 +22,9 @@ unsafe class ImGuiBackend : IDisposable
     private int glShaderProgram;
     private const int glFontTextureUnit = 0;
     private const int glProjectionUniformLocation = 0;
+#if !GL_HAS_SHADING_LANGUAGE_420PACK
+    private int projectionLocation = -1;
+#endif
 
     private int vertexBufferSize;
     private int indexBufferSize;
@@ -142,14 +145,24 @@ unsafe class ImGuiBackend : IDisposable
             int requiredVertexSize = cmdList.VtxBuffer.Size * sizeof(ImDrawVert);
             if (requiredVertexSize > vertexBufferSize)
             {
+#if GL_HAS_DSA
                 GL.NamedBufferData(glVertexBuffer, requiredVertexSize, null, BufferUsage.StaticDraw);
+#else
+                GL.BindBuffer(BufferTarget.ArrayBuffer, glVertexBuffer);
+                GL.BufferData(BufferTarget.ArrayBuffer, requiredVertexSize, IntPtr.Zero, (BufferUsage)0x88E4);
+#endif
                 vertexBufferSize = requiredVertexSize;
             }
 
             int requiredIndexSize = cmdList.IdxBuffer.Size * sizeof(ushort);
             if (requiredIndexSize > indexBufferSize)
             {
+#if GL_HAS_DSA
                 GL.NamedBufferData(glIndexBuffer, requiredIndexSize, null, BufferUsage.StaticDraw);
+#else
+                GL.BindBuffer(BufferTarget.ElementArrayBuffer, glIndexBuffer);
+                GL.BufferData(BufferTarget.ElementArrayBuffer, requiredIndexSize, IntPtr.Zero, (BufferUsage)0x88E4);
+#endif
                 indexBufferSize = requiredIndexSize;
             }
         }
@@ -161,7 +174,12 @@ unsafe class ImGuiBackend : IDisposable
             0.0f,
             -1.0f,
             1.0f);
+#if GL_HAS_SHADING_LANGUAGE_420PACK
         GL.ProgramUniformMatrix4f(glShaderProgram, glProjectionUniformLocation, 1, false, ref mvp);
+#else
+        GL.UseProgram(glShaderProgram);
+        GL.UniformMatrix4f(projectionLocation, 1, false, ref mvp);
+#endif
 
         GL.Enable(EnableCap.Blend);
         GL.Enable(EnableCap.ScissorTest);
@@ -178,8 +196,15 @@ unsafe class ImGuiBackend : IDisposable
         {
             ref readonly ImDrawListPtr cmdList = ref drawData.CmdLists[i];
 
+#if GL_HAS_DSA
             GL.NamedBufferSubData(glVertexBuffer, 0, cmdList.VtxBuffer.Size * sizeof(ImDrawVert), cmdList.VtxBuffer.Data);
             GL.NamedBufferSubData(glIndexBuffer, 0, cmdList.IdxBuffer.Size * sizeof(ushort), cmdList.IdxBuffer.Data);
+#else
+            GL.BindBuffer(BufferTarget.ArrayBuffer, glVertexBuffer);
+            GL.BufferSubData(BufferTarget.ArrayBuffer, IntPtr.Zero, cmdList.VtxBuffer.Size * sizeof(ImDrawVert), cmdList.VtxBuffer.Data);
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, glIndexBuffer);
+            GL.BufferSubData(BufferTarget.ElementArrayBuffer, IntPtr.Zero, cmdList.IdxBuffer.Size * sizeof(ushort), cmdList.IdxBuffer.Data);
+#endif
 
             for (int j = 0; j < cmdList.CmdBuffer.Size; j++)
             {
@@ -194,8 +219,14 @@ unsafe class ImGuiBackend : IDisposable
                     System.Numerics.Vector4 clip = pcmd.ClipRect;
                     GL.Scissor((int)clip.X, windowSize.Y - (int)clip.W, (int)(clip.Z - clip.X), (int)(clip.W - clip.Y));
 
+#if GL_HAS_DSA
                     GL.BindTextureUnit(glFontTextureUnit, (int)pcmd.TextureId);
                     GL.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (void*)(pcmd.IdxOffset * sizeof(ushort)), (int)pcmd.VtxOffset);
+#else
+                    GL.ActiveTexture(TextureUnit.Texture0 + glFontTextureUnit);
+                    GL.BindTexture(TextureTarget.Texture2D, (int)pcmd.TextureId);
+                    GL.DrawElements(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (void*)(pcmd.IdxOffset * sizeof(ushort)));
+#endif
                 }
             }
         }
@@ -206,11 +237,21 @@ unsafe class ImGuiBackend : IDisposable
 
     private void CreateDeviceObjects()
     {
+#if GL_HAS_SHADING_LANGUAGE_420PACK
+        string ProjectionLayout = $"layout(location = {glProjectionUniformLocation}) ";
+        string SamplerLayout = $"layout(binding = {glFontTextureUnit}) ";
+#else
+        // explicit uniform locations are 4.3, layout(binding=) on a sampler is
+        // 4.2. Neither exists on 4.1, so both are looked up after the link.
+        string ProjectionLayout = "";
+        string SamplerLayout = "";
+#endif
+
         string vertexSource = 
             $$"""
-            #version 460 core
+            #version 410 core
             
-            layout(location = {{glProjectionUniformLocation}}) uniform mat4 Projection;
+            {{ProjectionLayout}}uniform mat4 Projection;
             
             layout(location = 0) in vec2 Position;
             layout(location = 1) in vec2 TexCoord;
@@ -232,10 +273,10 @@ unsafe class ImGuiBackend : IDisposable
 
         string fragmentSource = 
             $$"""
-            #version 460 core
+            #version 410 core
 
             layout(location = 0) out vec4 FragColor;
-            layout(binding = {{glFontTextureUnit}}) uniform sampler2D SamplerFont;
+            {{SamplerLayout}}uniform sampler2D SamplerFont;
 
             in InOutData
             {
@@ -251,7 +292,20 @@ unsafe class ImGuiBackend : IDisposable
 
         glShaderProgram = CreateProgram(vertexSource, fragmentSource);
 
+#if !GL_HAS_SHADING_LANGUAGE_420PACK
+        projectionLocation = GL.GetUniformLocation(glShaderProgram, "Projection");
+
+        int samplerLocation = GL.GetUniformLocation(glShaderProgram, "SamplerFont");
+        if (samplerLocation >= 0)
+        {
+            GL.UseProgram(glShaderProgram);
+            GL.Uniform1i(samplerLocation, glFontTextureUnit);
+            GL.UseProgram(0);
+        }
+#endif
+
         // These buffers are allocated and filled in the renderloop
+#if GL_HAS_DSA
         glVertexBuffer = GL.CreateBuffer();
         glIndexBuffer = GL.CreateBuffer();
 
@@ -270,25 +324,68 @@ unsafe class ImGuiBackend : IDisposable
         GL.EnableVertexArrayAttrib(glVertexArray, 2);
         GL.VertexArrayAttribFormat(glVertexArray, 2, 4, VertexAttribType.UnsignedByte, true, (uint)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)));
         GL.VertexArrayAttribBinding(glVertexArray, 2, 0);
+#else
+        glVertexBuffer = GL.GenBuffer();
+        glIndexBuffer = GL.GenBuffer();
+
+        glVertexArray = GL.GenVertexArray();
+        GL.BindVertexArray(glVertexArray);
+        GL.BindBuffer(BufferTarget.ElementArrayBuffer, glIndexBuffer);
+
+        // glBindVertexBuffer, glVertexAttribFormat and glVertexAttribBinding are
+        // ARB_vertex_attrib_binding, core in 4.3. Apple's 4.1 does not export them
+        // and calling one jumps to a null pointer, so use the older single call
+        // that carries the buffer, stride and offset together.
+        GL.BindBuffer(BufferTarget.ArrayBuffer, glVertexBuffer);
+
+        GL.EnableVertexAttribArray(0);
+        GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert),
+                               Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos)));
+
+        GL.EnableVertexAttribArray(1);
+        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert),
+                               Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv)));
+
+        GL.EnableVertexAttribArray(2);
+        GL.VertexAttribPointer(2, 4, VertexAttribPointerType.UnsignedByte, true, sizeof(ImDrawVert),
+                               Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)));
+#endif
 
         CreateFontsTexture();
     }
 
     private void CreateFontsTexture()
     {
+#if GL_HAS_DSA
         glFontTexture = GL.CreateTexture(TextureTarget.Texture2D);
+#else
+        glFontTexture = GL.GenTexture();
+#endif
 
         ImGuiIOPtr io = ImGui.GetIO();
         io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);
         io.Fonts.SetTexID((nint)glFontTexture);
 
+#if GL_HAS_TEXTURE_STORAGE
         GL.TextureStorage2D(glFontTexture, 1, SizedInternalFormat.Rgba8, width, height);
         GL.TextureSubImage2D(glFontTexture, 0, 0, 0, width, height, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+#else
+        GL.BindTexture(TextureTarget.Texture2D, glFontTexture);
+        GL.TexImage2D(TextureTarget.Texture2D, 0, (InternalFormat)0x8058, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+#endif
 
+#if GL_HAS_DSA
         GL.TextureParameteri(glFontTexture, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
         GL.TextureParameteri(glFontTexture, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
         GL.TextureParameteri(glFontTexture, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         GL.TextureParameteri(glFontTexture, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+#else
+        GL.BindTexture(TextureTarget.Texture2D, glFontTexture);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+        GL.TexParameteri(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+#endif
     }
 
     public void Dispose()

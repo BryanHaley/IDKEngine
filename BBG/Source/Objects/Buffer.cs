@@ -73,10 +73,29 @@ public static partial class BBG
         public BufferBackedBlockTarget BackingBlock { get; private set; }
         public int BlockIndex { get; private set; }
 
+#if !GL_HAS_DSA
+        // stands in for a persistently mapped pointer; see Allocate
+        private void* shadow;
+
+        // CopyWriteBuffer is the scratch target: nothing in the renderer draws
+        // from it, so binding here does not disturb any binding it cares about.
+        private const OpenTK.Graphics.OpenGL.BufferTarget EditTarget =
+            OpenTK.Graphics.OpenGL.BufferTarget.CopyWriteBuffer;
+
+        private void BindForEdit()
+        {
+            GL.BindBuffer(EditTarget, ID);
+        }
+#endif
+
         public Buffer()
         {
             int id = 0;
+#if GL_HAS_DSA
             GL.CreateBuffers(1, ref id);
+#else
+            GL.GenBuffers(1, ref id);
+#endif
 
             ID = id;
         }
@@ -90,7 +109,9 @@ public static partial class BBG
 
         public void InvalidateData()
         {
+#if GL_HAS_INVALIDATE_SUBDATA
             GL.InvalidateBufferData(ID);
+#endif
         }
 
         public void Allocate(MemLocation memLocation, MemAccess memAccess, nint size)
@@ -124,7 +145,15 @@ public static partial class BBG
                     memAccess != MemAccess.MappedCoherentWriteOnlyReBAR &&
                     data != null;
 
+#if GL_HAS_DSA && GL_HAS_BUFFER_STORAGE
                 GL.NamedBufferStorage(ID, size, doStagingBufferUpload ? null : data, (BufferStorageMask)memLocation | (BufferStorageMask)memAccess);
+#else
+                // glBufferStorage is 4.4. glBufferData gives mutable storage with
+                // a usage hint instead, which is as close as 4.1 gets.
+                BindForEdit();
+                GL.BufferData(EditTarget, size, doStagingBufferUpload ? null : data,
+                              memLocation == MemLocation.DeviceLocal ? BufferUsage.StaticDraw : BufferUsage.DynamicDraw);
+#endif
                 if (doStagingBufferUpload)
                 {
                     using Buffer stagingBuffer = new Buffer();
@@ -133,6 +162,7 @@ public static partial class BBG
                     stagingBuffer.CopyTo(this, 0, 0, stagingBuffer.Size);
                 }
 
+#if GL_HAS_DSA && GL_HAS_BUFFER_STORAGE
                 if (memAccess == MemAccess.MappedCoherent || memAccess == MemAccess.MappedCoherentWriteOnlyReBAR)
                 {
                     Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess);
@@ -141,6 +171,20 @@ public static partial class BBG
                 {
                     Memory = GL.MapNamedBufferRange(ID, 0, size, (MapBufferAccessMask)memAccess | MapBufferAccessMask.MapFlushExplicitBit);
                 }
+#else
+                // Persistent mapping needs 4.4. Hand out a CPU block of the same
+                // size instead and push it to the buffer on flush, so a caller
+                // that writes through Memory still gets its data to the GPU.
+                if (memAccess == MemAccess.MappedCoherent ||
+                    memAccess == MemAccess.MappedCoherentWriteOnlyReBAR ||
+                    memAccess == MemAccess.MappedIncoherent)
+                {
+                    WarnNoPersistentMapping();
+                    shadow = NativeMemory.Alloc((nuint)size);
+                    NativeMemory.Clear(shadow, (nuint)size);
+                    Memory = shadow;
+                }
+#endif
             }
         }
 
@@ -155,19 +199,36 @@ public static partial class BBG
         public void UploadData(nint offset, nint size, void* data)
         {
             if (size == 0) return;
+#if GL_HAS_DSA
             GL.NamedBufferSubData(ID, offset, size, data);
+#else
+            BindForEdit();
+            GL.BufferSubData(EditTarget, offset, size, data);
+#endif
         }
 
         public void DownloadData(nint offset, nint size, void* data)
         {
             if (size == 0) return;
+#if GL_HAS_DSA
             GL.GetNamedBufferSubData(ID, offset, size, data);
+#else
+            BindForEdit();
+            GL.GetBufferSubData(EditTarget, offset, size, data);
+#endif
         }
 
         public void CopyTo(Buffer buffer, nint readOffset, nint writeOffset, nint size)
         {
             if (size == 0) return;
+#if GL_HAS_DSA
             GL.CopyNamedBufferSubData(ID, buffer.ID, readOffset, writeOffset, size);
+#else
+            GL.BindBuffer(OpenTK.Graphics.OpenGL.BufferTarget.CopyReadBuffer, ID);
+            GL.BindBuffer(OpenTK.Graphics.OpenGL.BufferTarget.CopyWriteBuffer, buffer.ID);
+            GL.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer,
+                                 readOffset, writeOffset, size);
+#endif
         }
 
         public void Fill(in uint data)
@@ -194,14 +255,58 @@ public static partial class BBG
         public void Fill(Texture.InternalFormat internalFormat, Texture.PixelFormat pixelFormat, Texture.PixelType pixelType, nint offset, nint size, void* data)
         {
             if (size == 0) return;
+#if GL_HAS_DSA
             GL.ClearNamedBufferSubData(ID, (SizedInternalFormat)internalFormat, offset, size, (PixelFormat)pixelFormat, (PixelType)pixelType, data);
+#else
+            // glClearBufferSubData is 4.3; write the pattern from the CPU instead
+            FillFromCpu(offset, size, data);
+#endif
         }
 
         public void FlushMemory(nint offset, nint size)
         {
             if (size == 0) return;
+#if GL_HAS_DSA
             GL.FlushMappedNamedBufferRange(ID, offset, size);
+#else
+            // the shadow is ordinary memory, so a flush is an upload
+            if (shadow != null)
+            {
+                BindForEdit();
+                GL.BufferSubData(EditTarget, offset, size, (byte*)shadow + offset);
+            }
+#endif
         }
+
+
+#if !GL_HAS_DSA
+        private static bool warnedMapping;
+
+        private static void WarnNoPersistentMapping()
+        {
+            if (warnedMapping) return;
+            warnedMapping = true;
+            BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn,
+                "Persistent buffer mapping needs GL 4.4; this build uploads instead");
+        }
+
+        private void FillFromCpu(nint offset, nint size, void* pattern)
+        {
+            // the pattern is one element wide; repeat it across the range
+            byte[] scratch = new byte[size];
+            byte* src = (byte*)pattern;
+            for (nint i = 0; i < size; i++)
+            {
+                scratch[i] = src[i % 4];
+            }
+
+            fixed (byte* dst = scratch)
+            {
+                BindForEdit();
+                GL.BufferSubData(EditTarget, offset, size, dst);
+            }
+        }
+#endif
 
         public bool IsDeleted()
         {
@@ -217,7 +322,16 @@ public static partial class BBG
 
             if (Memory != null)
             {
+#if GL_HAS_DSA
                 GL.UnmapNamedBuffer(ID);
+#else
+                if (shadow != null)
+                {
+                    NativeMemory.Free(shadow);
+                    shadow = null;
+                }
+                Memory = null;
+#endif
             }
 
             GL.DeleteBuffer(ID);

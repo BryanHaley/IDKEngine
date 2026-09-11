@@ -53,6 +53,7 @@ public static partial class BBG
             set
             {
                 _enableDebugCallback = value;
+#if GL_HAS_DEBUG_OUTPUT
                 if (_enableDebugCallback)
                 {
                     GL.Enable(EnableCap.DebugOutput);
@@ -63,6 +64,7 @@ public static partial class BBG
                 {
                     GL.Disable(EnableCap.DebugOutput);
                 }
+#endif
             }
         }
 
@@ -70,7 +72,9 @@ public static partial class BBG
         {
             if (EnableDebugGroups)
             {
+#if GL_HAS_DEBUG_OUTPUT
                 GL.PushDebugGroup(OpenTK.Graphics.OpenGL.DebugSource.DebugSourceApplication, DEBUG_GROUP_MESSAGE_ID, message.Length, message);
+#endif
             }
         }
 
@@ -78,7 +82,9 @@ public static partial class BBG
         {
             if (EnableDebugGroups)
             {
+#if GL_HAS_DEBUG_OUTPUT
                 GL.PopDebugGroup();
+#endif
             }
         }
 

@@ -107,8 +107,17 @@ abstract unsafe class GameWindowBase : IDisposable
             glfwInitialized = true;
         }
 
+#if GL_HAS_DEBUG_OUTPUT
         GLFW.WindowHint(WindowHintBool.OpenGLDebugContext, true);
+#endif
+#if GL_CORE_PROFILE_ONLY
+        // macOS hands out a 2.1 compat context or a core forward-compatible one.
+        // There is no third option.
+        GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Core);
+        GLFW.WindowHint(WindowHintBool.OpenGLForwardCompat, true);
+#else
         GLFW.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Compat);
+#endif
         GLFW.WindowHint(WindowHintInt.ContextVersionMajor, openglMajor);
         GLFW.WindowHint(WindowHintInt.ContextVersionMinor, openglMinor);
         GLFW.WindowHint(WindowHintInt.Samples, 1);
@@ -159,7 +168,12 @@ abstract unsafe class GameWindowBase : IDisposable
         {
             // Make window black (calling SwapBuffers here irritates diagnostic tools like renderdoc)
             Vector4 clearColor = new Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+#if GL_HAS_DSA
             OpenTK.Graphics.OpenGL.GL.ClearNamedFramebufferf(0, OpenTK.Graphics.OpenGL.Buffer.Color, 0, ref clearColor.X);
+#else
+            OpenTK.Graphics.OpenGL.GL.ClearColor(clearColor.X, clearColor.Y, clearColor.Z, clearColor.W);
+            OpenTK.Graphics.OpenGL.GL.Clear(OpenTK.Graphics.OpenGL.ClearBufferMask.ColorBufferBit);
+#endif
             GLFW.SwapBuffers(window);
         }
     }

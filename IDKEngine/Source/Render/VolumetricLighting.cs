@@ -38,13 +38,16 @@ class VolumetricLighting : IDisposable
     public GpuSettings Settings;
 
     public BBG.Texture Result;
+#if GL_HAS_COMPUTE_SHADER
     private BBG.Texture depthTexture;
     private BBG.Texture volumetricLightingTexture;
 
     private readonly BBG.AbstractShaderProgram volumetricLightingProgram;
     private readonly BBG.AbstractShaderProgram upscaleProgram;
+#endif
     public VolumetricLighting(Vector2i size, in GpuSettings settings, float resolutionScale = 0.6f)
     {
+#if GL_HAS_COMPUTE_SHADER
         volumetricLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/compute.glsl"));
         upscaleProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "VolumetricLight/Upscale/compute.glsl"));
 
@@ -52,10 +55,18 @@ class VolumetricLighting : IDisposable
         SetSize(size);
 
         Settings = settings;
+#else
+        BBLogger.Logger.Log(BBLogger.Logger.LogLevel.Warn, "VolumetricLighting needs compute shaders (GL_HAS_COMPUTE_SHADER); disabled in this build");
+        Result = new BBG.Texture(BBG.Texture.Type.Texture2D);
+        Result.Allocate(1, 1, 1, BBG.Texture.InternalFormat.R16G16B16A16Float);
+        PresentationResolution = new Vector2i(1, 1);
+        Settings = settings;
+#endif
     }
 
     public void Compute()
     {
+#if GL_HAS_COMPUTE_SHADER
         BBG.Computing.Compute("Compute Volumetric Lighting", () =>
         {
             BBG.Cmd.SetUniforms(Settings);
@@ -78,10 +89,12 @@ class VolumetricLighting : IDisposable
             BBG.Computing.Dispatch(MyMath.DivUp(PresentationResolution.X, 8), MyMath.DivUp(PresentationResolution.Y, 8), 1);
             BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.TextureFetchBarrierBit);
         });
+#endif
     }
 
     public void SetSize(Vector2i size)
     {
+#if GL_HAS_COMPUTE_SHADER
         PresentationResolution = new Vector2i(size.X, size.Y);
         RenderResolution = (Vector2i)((Vector2)PresentationResolution * ResolutionScale);
 
@@ -102,15 +115,20 @@ class VolumetricLighting : IDisposable
         depthTexture.SetFilter(BBG.Sampler.MinFilter.Nearest, BBG.Sampler.MagFilter.Nearest);
         depthTexture.SetWrapMode(BBG.Sampler.WrapMode.ClampToEdge, BBG.Sampler.WrapMode.ClampToEdge);
         depthTexture.Allocate(RenderResolution.X, RenderResolution.Y, 1, BBG.Texture.InternalFormat.R32Float);
+#endif
     }
 
     public void Dispose()
     {
+#if GL_HAS_COMPUTE_SHADER
         Result.Dispose();
         volumetricLightingTexture.Dispose();
         depthTexture.Dispose();
 
         volumetricLightingProgram.Dispose();
         upscaleProgram.Dispose();
+#else
+        Result.Dispose();
+#endif
     }
 }

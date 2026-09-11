@@ -75,7 +75,11 @@ public partial class BBG
         public Sampler(in SamplerState state)
         {
             int id = 0;
+#if GL_HAS_DSA
             GL.CreateSamplers(1, ref id);
+#else
+            GL.GenSamplers(1, ref id);
+#endif
 
             ID = id;
             SetState(state);

@@ -130,13 +130,22 @@ class Application : GameWindowBase
 
     private float animationTime;
 
-    public Application(int width, int height, string title)
-        : base(width, height, title, 4, 6)
+    private readonly Benchmark benchmark;
+
+    public Application(int width, int height, string title, Benchmark benchmark = null)
+        : base(width, height, title, BBOpenGL.GLCaps.VersionMajor, BBOpenGL.GLCaps.VersionMinor)
     {
+        this.benchmark = benchmark;
     }
 
     protected override void OnRender(float dT)
     {
+        if (benchmark != null && benchmark.OnFrame())
+        {
+            ShouldClose();
+            return;
+        }
+
         MainThreadQueue.Execute();
 
         HandleFrameRecorderLogic();
@@ -404,16 +413,20 @@ class Application : GameWindowBase
         Logger.Log(Logger.LogLevel.Info, $"GPU: {glContextInfo.DeviceInfo.Name}");
         Logger.Log(Logger.LogLevel.Info, $"{nameof(BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_DIRECTIVE_SOURCEFILE)} = {BBG.AbstractShader.Preprocessor.SUPPORTS_LINE_DIRECTIVE_SOURCEFILE}");
 
+#if GL_CONTEXT_4_6
         if (glContextInfo.GLVersion < 4.6)
         {
             Logger.Log(Logger.LogLevel.Fatal, "Your system does not support OpenGL 4.6");
             Environment.Exit(0);
         }
+#endif
+#if GL_HAS_BINDLESS_TEXTURE
         if (!glContextInfo.DeviceInfo.ExtensionSupport.BindlessTextures)
         {
             Logger.Log(Logger.LogLevel.Fatal, "Your system does not support GL_ARB_bindless_texture");
             Environment.Exit(0);
         }
+#endif
         if (!glContextInfo.DeviceInfo.ExtensionSupport.ImageLoadFormatted)
         {
             Logger.Log(Logger.LogLevel.Fatal,

@@ -7,9 +7,11 @@ namespace Program;
 
 class EntryPoint
 {
-    private static void Main()
+    private static void Main(string[] args)
     {
-        using Application application = new Application(1600, 800, "IDKEngine");
+        Benchmark benchmark = new Benchmark(args);
+
+        using Application application = new Application(benchmark.Width, benchmark.Height, "IDKEngine", benchmark);
 
         // If application is run inside a debugger then we don't catch Exceptions here
         // as this worsens the debugging experience.

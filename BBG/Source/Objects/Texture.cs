@@ -20,58 +20,32 @@ public static partial class BBG
         
         public enum InternalFormat : uint
         {
-            // UNorm = [ 0, 1] range
-            // SNorm = [-1, 1] range
-            // Float = float range
-            // Uint  = uint range
-            // D     = depth formats
-            // S     = stencil formats
-
             R8Unorm = SizedInternalFormat.R8,
             R8UInt = SizedInternalFormat.R8ui,
-
             R16Float = SizedInternalFormat.R16f,
-
             R32Float = SizedInternalFormat.R32f,
             R32Int = SizedInternalFormat.R32i,
             R32UInt = SizedInternalFormat.R32ui,
-
             R8G8Unorm = SizedInternalFormat.Rg8,
             R8G8Snorm = SizedInternalFormat.Rg8Snorm,
-
             R16G16Float = SizedInternalFormat.Rg16f,
             R32G32Float = SizedInternalFormat.Rg32f,
-
             R11G11B10Float = SizedInternalFormat.R11fG11fB10f,
-
             R8G8B8A8Unorm = SizedInternalFormat.Rgba8,
             R8G8B8A8Snorm = SizedInternalFormat.Rgba8Snorm,
             R8G8B8A8SRgb = SizedInternalFormat.Srgb8Alpha8,
-
             R16G16B16A16Float = SizedInternalFormat.Rgba16f,
             R32G32B32A32Float = SizedInternalFormat.Rgba32f,
-
             BC1RgbUnorm = SizedInternalFormat.CompressedRgbS3tcDxt1Ext,
             BC4RUnorm = SizedInternalFormat.CompressedRedRgtc1,
             BC5RgUnorm = SizedInternalFormat.CompressedRgRgtc2,
             BC7RgbaUnorm = SizedInternalFormat.CompressedRgbaBptcUnorm,
             BC7RgbaSrgb = SizedInternalFormat.CompressedSrgbAlphaBptcUnorm,
-
-            /// <summary>
-            /// Requires GL_KHR_texture_compression_astc
-            /// </summary>
             Astc4X4RgbaKHR = SizedInternalFormat.CompressedRgbaAstc4x4Khr,
-
-            /// <summary>
-            /// Requires GL_KHR_texture_compression_astc
-            /// </summary>
             Astc4X4RgbaSrgbKHR = SizedInternalFormat.CompressedSrgb8Alpha8Astc4x4Khr,
-
             D16Unorm = SizedInternalFormat.DepthComponent16,
             D32Float = SizedInternalFormat.DepthComponent32f,
-
             S8UInt = SizedInternalFormat.StencilIndex8,
-
             D24UnormS8UInt = SizedInternalFormat.Depth24Stencil8,
         }
 
@@ -132,70 +106,96 @@ public static partial class BBG
         public Texture(Type textureType)
         {
             int id = 0;
+#if GL_HAS_DSA
             GL.CreateTextures((TextureTarget)textureType, 1, ref id);
-
+#else
+            GL.GenTextures(1, ref id);
+#endif
             ID = id;
             TextureType = textureType;
         }
 
+#if !GL_HAS_DSA
+        // Without DSA a parameter can only be set on a bound texture. Unit 15 is
+        // the scratch one: the renderer binds what it needs before every draw, so
+        // clobbering a high unit here costs nothing.
+        private const TextureUnit ScratchUnit = TextureUnit.Texture15;
+
+        private void BindForEdit()
+        {
+            GL.ActiveTexture(ScratchUnit);
+            GL.BindTexture((TextureTarget)TextureType, ID);
+        }
+#endif
+
+        private void Param(TextureParameterName name, int value)
+        {
+#if GL_HAS_DSA
+            Param(name, value);
+#else
+            BindForEdit();
+            GL.TexParameteri((TextureTarget)TextureType, name, value);
+#endif
+        }
+
+        private void ParamF(TextureParameterName name, float value)
+        {
+#if GL_HAS_DSA
+            ParamF(name, value);
+#else
+            BindForEdit();
+            GL.TexParameterf((TextureTarget)TextureType, name, value);
+#endif
+        }
+
         public void SetFilter(Sampler.MinFilter minFilter, Sampler.MagFilter magFilter)
         {
-            /// GL_NEAREST_MIPMAP_NEAREST: takes the nearest mipmap to match the pixel size and uses nearest neighbor interpolation for texture sampling.
-            /// GL_LINEAR_MIPMAP_NEAREST: takes the nearest mipmap level and samples that level using linear interpolation.
-            /// GL_NEAREST_MIPMAP_LINEAR: linearly interpolates between the two mipmaps that most closely match the size of a pixel and samples the interpolated level via nearest neighbor interpolation.
-            /// GL_LINEAR_MIPMAP_LINEAR: linearly interpolates between the two closest mipmaps and samples the interpolated level via linear interpolation.
-
-            GL.TextureParameteri(ID, TextureParameterName.TextureMinFilter, (int)minFilter);
-            GL.TextureParameteri(ID, TextureParameterName.TextureMagFilter, (int)magFilter);
+            Param(TextureParameterName.TextureMinFilter, (int)minFilter);
+            Param(TextureParameterName.TextureMagFilter, (int)magFilter);
         }
 
         public void SetWrapMode(Sampler.WrapMode wrapS, Sampler.WrapMode wrapT)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureWrapS, (int)wrapS);
-            GL.TextureParameteri(ID, TextureParameterName.TextureWrapT, (int)wrapT);
+            Param(TextureParameterName.TextureWrapS, (int)wrapS);
+            Param(TextureParameterName.TextureWrapT, (int)wrapT);
         }
 
         public void SetWrapMode(Sampler.WrapMode wrapS, Sampler.WrapMode wrapT, Sampler.WrapMode wrapR)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureWrapS, (int)wrapS);
-            GL.TextureParameteri(ID, TextureParameterName.TextureWrapT, (int)wrapT);
-            GL.TextureParameteri(ID, TextureParameterName.TextureWrapR, (int)wrapR);
+            Param(TextureParameterName.TextureWrapS, (int)wrapS);
+            Param(TextureParameterName.TextureWrapT, (int)wrapT);
+            Param(TextureParameterName.TextureWrapR, (int)wrapR);
         }
 
         public void SetSwizzleR(Swizzle swizzle)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleR, (int)swizzle);
+            Param(TextureParameterName.TextureSwizzleR, (int)swizzle);
         }
         public void SetSwizzleG(Swizzle swizzle)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleG, (int)swizzle);
+            Param(TextureParameterName.TextureSwizzleG, (int)swizzle);
         }
         public void SetSwizzleB(Swizzle swizzle)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleB, (int)swizzle);
+            Param(TextureParameterName.TextureSwizzleB, (int)swizzle);
         }
         public void SetSwizzleA(Swizzle swizzle)
         {
-            GL.TextureParameteri(ID, TextureParameterName.TextureSwizzleA, (int)swizzle);
+            Param(TextureParameterName.TextureSwizzleA, (int)swizzle);
         }
 
         public void SetAnisotropy(Sampler.Anisotropy anisotropy)
         {
-            GL.TextureParameterf(ID, TextureParameterName.TextureMaxAnisotropy, (float)anisotropy);
+            ParamF(TextureParameterName.TextureMaxAnisotropy, (float)anisotropy);
         }
 
-        /// <summary>
-        /// GL_ARB_seamless_cubemap_per_texture or GL_AMD_seamless_cubemap_per_texture must be available for this to take effect
-        /// </summary>
-        /// <param name="state"></param>
         public bool TryEnableSeamlessCubemap(bool state)
         {
             if (contextInfo.DeviceInfo.ExtensionSupport.SeamlessCubemapPerTexture)
             {
-                GL.TextureParameteri(ID, (TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
+                Param((TextureParameterName)All.TextureCubeMapSeamless, state ? 1 : 0);
                 return true;
             }
-
             return false;
         }
 
@@ -208,7 +208,13 @@ public static partial class BBG
         }
         public void Upload3D(int width, int height, int depth, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
+#if GL_HAS_DSA
             GL.TextureSubImage3D(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            GL.TexSubImage3D((TextureTarget)TextureType, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
 
         public void Upload2D<T>(int width, int height, PixelFormat pixelFormat, PixelType pixelType, in T pixels, int level = 0, int xOffset = 0, int yOffset = 0) where T : unmanaged
@@ -220,7 +226,13 @@ public static partial class BBG
         }
         public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
+#if GL_HAS_DSA
             GL.TextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            GL.TexSubImage2D((TextureTarget)TextureType, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
         public void Upload2D(int width, int height, PixelFormat pixelFormat, PixelType pixelType, Buffer buffer, nint offset = 0, int level = 0, int xOffset = 0, int yOffset = 0)
         {
@@ -232,7 +244,13 @@ public static partial class BBG
         public void UploadCompressed2D(int width, int height, void* pixels, int level = 0, int xOffset = 0, int yOffset = 0)
         {
             int imageSize = GetBlockCompressedImageSize(Format, width, height, 1);
+#if GL_HAS_DSA
             GL.CompressedTextureSubImage2D(ID, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, pixels);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            GL.CompressedTexSubImage2D((TextureTarget)TextureType, level, xOffset, yOffset, width, height, (OpenTK.Graphics.OpenGL.InternalFormat)Format, imageSize, pixels);
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
 
         public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int bufSize, int level = 0)
@@ -247,7 +265,13 @@ public static partial class BBG
         }
         public void Download(PixelFormat pixelFormat, PixelType pixelType, void* pixels, int width, int height, int depth, int bufSize, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
+#if GL_HAS_DSA
             GL.GetTextureSubImage(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, bufSize, pixels);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            GL.GetTexImage((TextureTarget)TextureType, level, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, pixels);
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
 
         public void Fill(Vector4 color, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
@@ -267,12 +291,33 @@ public static partial class BBG
 
         public void Fill(PixelFormat pixelFormat, PixelType pixelType, void* data, int width, int height, int depth, int level = 0, int xOffset = 0, int yOffset = 0, int zOffset = 0)
         {
+#if GL_HAS_DSA
             GL.ClearTexSubImage(ID, level, xOffset, yOffset, zOffset, width, height, depth, (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            if (TextureType == Type.Texture3D || TextureType == Type.Texture2DArray)
+            {
+                GL.TexSubImage3D((TextureTarget)TextureType, level, xOffset, yOffset, zOffset, width, height, depth,
+                    (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
+            }
+            else
+            {
+                GL.TexSubImage2D((TextureTarget)TextureType, level, xOffset, yOffset, width, height,
+                    (OpenTK.Graphics.OpenGL.PixelFormat)pixelFormat, (OpenTK.Graphics.OpenGL.PixelType)pixelType, data);
+            }
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
 
         public void GenerateMipmap()
         {
+#if GL_HAS_DSA
             GL.GenerateTextureMipmap(ID);
+#else
+            GL.BindTexture((TextureTarget)TextureType, ID);
+            GL.GenerateMipmap((TextureTarget)TextureType);
+            GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
         }
 
         public void Allocate(int width, int height, int depth, InternalFormat format, int levels = 1)
@@ -281,7 +326,18 @@ public static partial class BBG
             {
                 case Type.Texture2D:
                 case Type.Cubemap:
+#if GL_HAS_TEXTURE_STORAGE
                     GL.TextureStorage2D(ID, levels, (SizedInternalFormat)format, width, height);
+#else
+                    GL.BindTexture((TextureTarget)TextureType, ID);
+                    for (int l = 0; l < levels; l++)
+                    {
+                        Vector3i mipSize = GetMipmapLevelSize(width, height, 1, l);
+                        GL.TexImage2D((TextureTarget)TextureType, l, (OpenTK.Graphics.OpenGL.InternalFormat)format, mipSize.X, mipSize.Y, 0,
+                            OpenTK.Graphics.OpenGL.PixelFormat.Rgba, OpenTK.Graphics.OpenGL.PixelType.UnsignedByte, IntPtr.Zero);
+                    }
+                    GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
                     Width = width;
                     Height = height;
                     Depth = 1;
@@ -290,7 +346,18 @@ public static partial class BBG
 
                 case Type.Texture2DArray:
                 case Type.Texture3D:
+#if GL_HAS_TEXTURE_STORAGE
                     GL.TextureStorage3D(ID, levels, (SizedInternalFormat)format, width, height, depth);
+#else
+                    GL.BindTexture((TextureTarget)TextureType, ID);
+                    for (int l = 0; l < levels; l++)
+                    {
+                        Vector3i mipSize = GetMipmapLevelSize(width, height, depth, l);
+                        GL.TexImage3D((TextureTarget)TextureType, l, (OpenTK.Graphics.OpenGL.InternalFormat)format, mipSize.X, mipSize.Y, mipSize.Z, 0,
+                            OpenTK.Graphics.OpenGL.PixelFormat.Rgba, OpenTK.Graphics.OpenGL.PixelType.UnsignedByte, IntPtr.Zero);
+                    }
+                    GL.BindTexture((TextureTarget)TextureType, 0);
+#endif
                     Width = width;
                     Height = height;
                     Depth = depth;
@@ -303,49 +370,43 @@ public static partial class BBG
             Format = format;
         }
 
-        /// <summary>
-        /// Requires GL_ARB_bindless_texture
-        /// </summary>
-        /// <returns></returns>
         public BindlessHandle GetTextureHandleARB()
         {
+#if GL_HAS_BINDLESS_TEXTURE
             BindlessHandle bindlessHandle = new BindlessHandle();
             bindlessHandle.GLHandle = GL.ARB.GetTextureHandleARB(ID);
-
             GL.ARB.MakeTextureHandleResidentARB(bindlessHandle.GLHandle);
-
             bindlessTextureHandles.Add(bindlessHandle);
             return bindlessHandle;
+#else
+            return new BindlessHandle { GLHandle = 0 };
+#endif
         }
 
-        /// <summary>
-        /// Requires GL_ARB_bindless_texture
-        /// </summary>
-        /// <returns></returns>
         public BindlessHandle GetTextureHandleARB(Sampler samplerObject)
         {
+#if GL_HAS_BINDLESS_TEXTURE
             BindlessHandle bindlessHandle = new BindlessHandle();
             bindlessHandle.GLHandle = GL.ARB.GetTextureSamplerHandleARB(ID, samplerObject.ID);
-            
             GL.ARB.MakeTextureHandleResidentARB(bindlessHandle.GLHandle);
-
             bindlessTextureHandles.Add(bindlessHandle);
             return bindlessHandle;
+#else
+            return new BindlessHandle { GLHandle = 0 };
+#endif
         }
 
-        /// <summary>
-        /// Requires GL_ARB_bindless_texture
-        /// </summary>
-        /// <returns></returns>
         public BindlessHandle GetImageHandleARB(InternalFormat format, int layer = 0, bool layered = false, int level = 0)
         {
+#if GL_HAS_BINDLESS_TEXTURE
             BindlessHandle bindlessHandle = new BindlessHandle();
             bindlessHandle.GLHandle = GL.ARB.GetImageHandleARB(ID, level, layered, layer, (OpenTK.Graphics.OpenGL.PixelFormat)format);
-
             GL.ARB.MakeImageHandleResidentARB(bindlessHandle.GLHandle, All.ReadWrite);
-
             bindlessImageHandles.Add(bindlessHandle);
             return bindlessHandle;
+#else
+            return new BindlessHandle { GLHandle = 0 };
+#endif
         }
 
         public bool IsDeleted()
@@ -364,7 +425,6 @@ public static partial class BBG
             {
                 return IsIntegerFormat(Format) ? PixelFormat.RGBAInteger : PixelFormat.RGBA;
             }
-
             throw new NotImplementedException();
         }
 
@@ -377,6 +437,7 @@ public static partial class BBG
 
             FramebufferCache.DeleteFramebuffersWithTexture(this);
 
+#if GL_HAS_BINDLESS_TEXTURE
             for (int i = 0; i < bindlessTextureHandles.Count; i++)
             {
                 if (GL.ARB.IsTextureHandleResidentARB(bindlessTextureHandles[i].GLHandle))
@@ -394,6 +455,10 @@ public static partial class BBG
                 }
             }
             bindlessImageHandles = null;
+#else
+            bindlessTextureHandles = null;
+            bindlessImageHandles = null;
+#endif
 
             GL.DeleteTexture(ID);
             ID = 0;
@@ -403,7 +468,6 @@ public static partial class BBG
         {
             int max = int.Max(width, int.Max(height, depth));
             int bitWidth = 32 - System.Numerics.BitOperations.LeadingZeroCount((uint)max);
-
             return bitWidth;
         }
 
@@ -415,25 +479,15 @@ public static partial class BBG
 
         public static int GetBlockCompressedImageSize(InternalFormat format, int width, int height, int depth)
         {
-            // Returns the same as KTX2.GetImageSize()
-            // Source: https://github.com/JuanDiegoMontoya/Fwog/blob/a26365764fbcca77dfdef0184f1aaff1825c605f/src/Texture.cpp#L22
-            //         https://www.reedbeta.com/blog/understanding-bcn-texture-compression-formats/
-            //         https://themaister.net/blog/2020/08/12/compressed-gpu-texture-formats-a-review-and-compute-shader-decoders-part-1/
-
-            // BCn formats store 4x4 blocks of pixels, even if the dimensions aren't a multiple of 4
-            // We round up to the nearest multiple of 4 for width and height, but not depth, since
-            // 3D BCn images are just multiple 2D images stacked
             width = (width + 4 - 1) & -4;
             height = (height + 4 - 1) & -4;
 
             switch (format)
             {
-                // BC1 and BC4 store 4x4 blocks with 64 bits (8 bytes)
                 case InternalFormat.BC1RgbUnorm:
                 case InternalFormat.BC4RUnorm:
                     return width * height * depth / 2;
 
-                // BC3, BC5, BC6, BC7 and ASTC store 4x4 blocks with 128 bits (16 bytes)
                 case InternalFormat.BC5RgUnorm:
                 case InternalFormat.BC7RgbaUnorm:
                 case InternalFormat.BC7RgbaSrgb:
@@ -462,17 +516,14 @@ public static partial class BBG
             {
                 return InternalFormatType.Depth;
             }
-
             if (internalFormat == InternalFormat.S8UInt)
             {
                 return InternalFormatType.Stencil;
             }
-
             if (internalFormat == InternalFormat.D24UnormS8UInt)
             {
                 return InternalFormatType.DepthStencil;
             }
-
             return InternalFormatType.Color;
         }
 

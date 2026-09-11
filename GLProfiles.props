@@ -1,0 +1,116 @@
+<Project>
+
+  <!--
+    Which GL features the build is allowed to use.
+
+    IDKEngine was written against OpenGL 4.6 with a pile of NVIDIA extensions.
+    macOS stops at 4.1, so every feature above that has to be switched off at
+    compile time. Each symbol names one feature; a profile is just the list of
+    symbols a given driver can actually run.
+
+    Pick one with -p:GLProfile=NAME. Default is GL46, which is upstream's
+    behaviour, so a Windows or Linux build is unchanged.
+
+      GL46        everything, as upstream ships it
+      MACOS_GL41  Apple's driver: 4.1 core, no extensions worth having
+      MGL         MGL, our Metal-backed 4.6. Grows as MGL does - this is the
+                  list to edit when a feature starts working.
+  -->
+
+  <PropertyGroup>
+    <GLProfile Condition="'$(GLProfile)' == ''">GL46</GLProfile>
+  </PropertyGroup>
+
+  <!-- Core profile features, by the GL version that made them core. -->
+  <PropertyGroup Condition="'$(GLProfile)' == 'GL46'">
+    <GLCaps>
+      GL_HAS_TEXTURE_STORAGE;
+      GL_HAS_IMAGE_LOAD_STORE;
+      GL_HAS_ATOMIC_COUNTERS;
+      GL_HAS_COMPUTE_SHADER;
+      GL_HAS_SSBO;
+      GL_HAS_MULTI_DRAW_INDIRECT;
+      GL_HAS_TEXTURE_VIEW;
+      GL_HAS_DEBUG_OUTPUT;
+      GL_HAS_INVALIDATE_SUBDATA;
+      GL_HAS_BUFFER_STORAGE;
+      GL_HAS_DSA;
+      GL_HAS_CLIP_CONTROL;
+      GL_HAS_TEXTURE_BARRIER;
+      GL_HAS_POLYGON_OFFSET_CLAMP;
+      GL_HAS_ANISOTROPIC_FILTER;
+      GL_HAS_SPIRV;
+      GL_HAS_BINDLESS_TEXTURE;
+      GL_HAS_SHADER_VIEWPORT_LAYER;
+      GL_HAS_SHADING_LANGUAGE_INCLUDE;
+      GL_HAS_SHADING_LANGUAGE_420PACK;
+      GL_HAS_VERTEX_ATTRIB_BINDING;
+      GL_HAS_SUBGROUP;
+      GL_HAS_MESH_SHADER;
+      GL_HAS_CONSERVATIVE_RASTER;
+      GL_HAS_VARIABLE_RATE_SHADING;
+      GL_HAS_VIEWPORT_SWIZZLE;
+      GL_HAS_GEOMETRY_PASSTHROUGH;
+      GL_HAS_FP16_ARITHMETIC;
+      GL_HAS_FP16_ATOMICS;
+      GL_HAS_SEAMLESS_CUBEMAP_PER_TEXTURE;
+      HAS_FSR2;
+      HAS_KTX2;
+      HAS_MESHOPTIMIZER;
+      HAS_OIDN;
+      GL_CONTEXT_4_6
+    </GLCaps>
+  </PropertyGroup>
+
+  <!--
+    Apple's GL 4.1. What is left is: core 4.1, ARB_viewport_array,
+    EXT_texture_filter_anisotropic, and nothing else. No compute, no SSBO,
+    no DSA, no bindless. The renderer is built on all four, so this profile
+    exists to prove the non-GL half of the port and to give MGL a floor to
+    beat - not to draw a frame.
+
+    Native libraries: FSR2 ships a Windows-only GL backend. KTX2 and
+    meshoptimizer have no macOS binary in their NuGet packages; they are
+    switched on by MacOSNativeLibs once the dylibs are built.
+  -->
+  <PropertyGroup Condition="'$(GLProfile)' == 'MACOS_GL41'">
+    <GLCaps>
+      GL_HAS_ANISOTROPIC_FILTER;
+      HAS_OIDN;
+      GL_CONTEXT_4_1;
+      GL_CORE_PROFILE_ONLY
+    </GLCaps>
+  </PropertyGroup>
+
+  <!--
+    MGL. Add a symbol here the day the feature passes its test, never before:
+    a feature listed here that does not work turns a clean "disabled" message
+    into a crash.
+  -->
+  <PropertyGroup Condition="'$(GLProfile)' == 'MGL'">
+    <GLCaps>
+      GL_HAS_TEXTURE_STORAGE;
+      GL_HAS_DSA;
+      GL_HAS_BUFFER_STORAGE;
+      GL_HAS_ANISOTROPIC_FILTER;
+      HAS_OIDN;
+      GL_CONTEXT_4_6;
+      GL_CORE_PROFILE_ONLY
+    </GLCaps>
+  </PropertyGroup>
+
+  <!-- Built by tools/build_macos_natives.sh; off until they exist. -->
+  <PropertyGroup>
+    <MacOSNativeLibDir>$(MSBuildThisFileDirectory)NativeLibs/osx-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</MacOSNativeLibDir>
+    <MacOSNativeLibs Condition="'$(MacOSNativeLibs)' == '' And Exists('$(MacOSNativeLibDir)/libktx.dylib') And Exists('$(MacOSNativeLibDir)/libmeshoptimizer.dylib')">true</MacOSNativeLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(MacOSNativeLibs)' == 'true'">
+    <GLCaps>$(GLCaps);HAS_KTX2;HAS_MESHOPTIMIZER</GLCaps>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GLCapsFlat>$([System.Text.RegularExpressions.Regex]::Replace($(GLCaps), '\s', ''))</GLCapsFlat>
+    <DefineConstants>$(DefineConstants);$(GLCapsFlat)</DefineConstants>
+  </PropertyGroup>
+
+</Project>

@@ -11,7 +11,11 @@ public static partial class BBG
         public readonly int ID;
         public TimerQuery()
         {
+#if GL_HAS_DSA
             GL.CreateQueries(QueryTarget.TimeElapsed, 1, ref ID);
+#else
+            GL.GenQueries(1, ref ID);
+#endif
         }
 
         public static TimerQuery StartNew()
