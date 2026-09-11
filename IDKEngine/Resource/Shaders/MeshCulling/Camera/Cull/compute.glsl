@@ -70,7 +70,7 @@ void main()
         Box meshletOldNdcBounds = BoxTransformPerspective(localBounds, perFrameDataUBO.PrevProjView * prevModelMatrix, vertexBehindFrustum);
         if (!vertexBehindFrustum)
         {
-            isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, gBufferDataUBO.Depth);
+            isVisible = BoxDepthBufferIntersect(meshletOldNdcBounds, GBufferTex_Depth);
         }
     }
 #endif

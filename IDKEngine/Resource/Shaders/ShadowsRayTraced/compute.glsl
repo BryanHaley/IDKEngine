@@ -26,7 +26,7 @@ void main()
 
     GpuPointShadow pointShadow = shadowsUBO.PointShadows[gl_GlobalInvocationID.z];
 
-    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
+    float depth = texelFetch(GBufferTex_Depth, imgCoord, 0).r;
     if (depth == 1.0 || any(greaterThanEqual(imgCoord, imageSize(image2D(pointShadow.RayTracedShadowMapImage)))))
     {
         return;
@@ -37,7 +37,7 @@ void main()
     vec2 uv = (imgCoord + 0.5) / imageSize(image2D(pointShadow.RayTracedShadowMapImage));
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    vec3 normal = DecodeUnitVec(texelFetch(GBufferTex_Normal, imgCoord, 0).rg);
 
     float cosTheta = dot(normal, normalize(light.Position - unjitteredFragPos));
     if (cosTheta <= 0.0)

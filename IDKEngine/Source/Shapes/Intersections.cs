@@ -149,8 +149,9 @@ public static class Intersections
 
     public static bool BoxVsBox(in Box a, in Box b)
     {
-        return (Sse.MoveMask(Vector128.LessThanOrEqual(a.SimdMin, b.SimdMax)) & 0b0111) == 0b0111 &&
-               (Sse.MoveMask(Vector128.GreaterThanOrEqual(a.SimdMax, b.SimdMin)) & 0b0111) == 0b0111;
+        // ExtractMostSignificantBits is the portable MoveMask; Sse is x86 only
+        return (Vector128.LessThanOrEqual(a.SimdMin, b.SimdMax).ExtractMostSignificantBits() & 0b0111) == 0b0111 &&
+               (Vector128.GreaterThanOrEqual(a.SimdMax, b.SimdMin).ExtractMostSignificantBits() & 0b0111) == 0b0111;
 
         //return a.Min.X <= b.Max.X &&
         //       a.Min.Y <= b.Max.Y &&

@@ -103,8 +103,15 @@ struct GpuLight
 
 struct GpuPointShadow
 {
+#if APP_HAS_BINDLESS_TEXTURE
     samplerCube ShadowMapTexture;
     samplerCubeShadow PcfShadowTexture;
+#else
+    // no bindless: the handles still take their space so the block layout the
+    // client writes stays the same, they are just never sampled
+    uvec2 ShadowMapTexture;
+    uvec2 PcfShadowTexture;
+#endif
 
     mat4 ProjViewMatrices[6];
 
@@ -221,7 +228,11 @@ struct GpuAOVRay
 
 // Allow for custum sampler2D types. Mainly for supporting fp16 samplers from GL_AMD_gpu_shader_half_float_fetch
 #ifndef MATERIAL_SAMPLER_2D_TYPE
-#define MATERIAL_SAMPLER_2D_TYPE sampler2D
+    #if APP_HAS_BINDLESS_TEXTURE
+        #define MATERIAL_SAMPLER_2D_TYPE sampler2D
+    #else
+        #define MATERIAL_SAMPLER_2D_TYPE uvec2
+    #endif
 #endif
 struct GpuMaterial
 {

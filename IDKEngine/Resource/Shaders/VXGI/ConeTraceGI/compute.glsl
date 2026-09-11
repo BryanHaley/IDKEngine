@@ -22,7 +22,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
+    float depth = texelFetch(GBufferTex_Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -30,9 +30,9 @@ void main()
     }
 
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
-    float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
-    float roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
+    vec3 normal = DecodeUnitVec(texelFetch(GBufferTex_Normal, imgCoord, 0).rg);
+    float specular = texelFetch(GBufferTex_MetallicRoughness, imgCoord, 0).r;
+    float roughness = texelFetch(GBufferTex_MetallicRoughness, imgCoord, 0).g;
 
     Surface surface = GetDefaultSurface();
     surface.Metallic = specular;

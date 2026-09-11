@@ -14,7 +14,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float highResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(gBufferDataUBO.Depth, uv).r) / perFrameDataUBO.FarPlane;
+    float highResDepth = LogarithmicDepthToLinearViewDepth(perFrameDataUBO.NearPlane, perFrameDataUBO.FarPlane, texture(GBufferTex_Depth, uv).r) / perFrameDataUBO.FarPlane;
 
     vec3 color = vec3(0.0);
 

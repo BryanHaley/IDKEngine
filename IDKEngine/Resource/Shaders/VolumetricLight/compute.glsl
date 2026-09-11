@@ -39,7 +39,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
 
-    float depth = texture(gBufferDataUBO.Depth, uv).r;
+    float depth = texture(GBufferTex_Depth, uv).r;
     vec3 ndc = vec3(uv * 2.0 - 1.0, depth);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);
     vec3 viewToFrag = unjitteredFragPos - perFrameDataUBO.ViewPos;

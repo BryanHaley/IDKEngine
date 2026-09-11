@@ -205,7 +205,7 @@ bool TraceRay(inout GpuWavefrontRay wavefrontRay, inout GpuAOVRay aovRay, out ui
     }
     else
     {
-        vec3 albedo = texture(skyBoxUBO.Albedo, rayDir).rgb;
+        vec3 albedo = texture(SkyBoxTex, rayDir).rgb;
         aovRay.Albedo += aovRay.NewWeight * albedo;
         aovRay.Normal += aovRay.NewWeight * CubemapFaceNormal(rayDir);
         aovRay.NewWeight = 0.0;

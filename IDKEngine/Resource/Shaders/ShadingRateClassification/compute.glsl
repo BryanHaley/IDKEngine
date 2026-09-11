@@ -31,7 +31,7 @@ void main()
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = (imgCoord + 0.5) / textureSize(SamplerShaded, 0);
 
-    vec2 velocity = texelFetch(gBufferDataUBO.Velocity, imgCoord, 0).rg;
+    vec2 velocity = texelFetch(GBufferTex_Velocity, imgCoord, 0).rg;
     vec3 srcColor = texelFetch(SamplerShaded, imgCoord, 0).rgb;
 
     float speedSum, luminanceSum, luminanceSquaredSum;

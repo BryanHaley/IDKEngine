@@ -56,7 +56,11 @@ float Visibility(GpuPointShadow pointShadow, vec3 normal, vec3 lightToSample)
     {
         vec3 samplePos = (lightToSample + ShadowSampleOffsets[i] * sampleDiskRadius);
         float depth = GetLightSpaceDepth(pointShadow, samplePos * (1.0 - bias));
+#if APP_HAS_BINDLESS_TEXTURE
         visibilityFactor += texture(pointShadow.PcfShadowTexture, vec4(samplePos, depth));
+#else
+        visibilityFactor += 1.0;   // no bindless, no shadow map: nothing is occluded
+#endif
     }
     visibilityFactor /= ShadowSampleOffsets.length();
 

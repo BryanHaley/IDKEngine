@@ -131,7 +131,7 @@ public static partial class BBG
         private void Param(TextureParameterName name, int value)
         {
 #if GL_HAS_DSA
-            Param(name, value);
+            GL.TextureParameteri(ID, name, value);
 #else
             BindForEdit();
             GL.TexParameteri((TextureTarget)TextureType, name, value);
@@ -141,7 +141,7 @@ public static partial class BBG
         private void ParamF(TextureParameterName name, float value)
         {
 #if GL_HAS_DSA
-            ParamF(name, value);
+            GL.TextureParameterf(ID, name, value);
 #else
             BindForEdit();
             GL.TexParameterf((TextureTarget)TextureType, name, value);

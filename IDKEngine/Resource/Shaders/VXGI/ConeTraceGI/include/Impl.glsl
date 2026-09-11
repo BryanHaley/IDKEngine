@@ -65,7 +65,7 @@ vec3 IndirectLight(Surface surface, sampler3D samplerVoxels, vec3 position, vec3
         }
 
         vec4 coneTrace = TraceCone(samplerVoxels, coneRay, surface.Normal, coneAngle, settings.StepMultiplier, settings.NormalRayOffset, 0.99);
-        coneTrace += (1.0 - coneTrace.a) * (texture(skyBoxUBO.Albedo, coneRay.Direction) * settings.GISkyBoxBoost);
+        coneTrace += (1.0 - coneTrace.a) * (texture(SkyBoxTex, coneRay.Direction) * settings.GISkyBoxBoost);
         
         irradiance += coneTrace.rgb;
     }

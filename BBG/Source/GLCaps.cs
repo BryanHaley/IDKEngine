@@ -138,6 +138,25 @@ public static class GLCaps
         false;
 #endif
 
+    /// <summary>
+    /// Cut the frame down to cull, G-Buffer, flat lighting, tonemap. Everything
+    /// else is switched off. For bringing a new driver up, not for looking at.
+    /// </summary>
+    public const bool MinimalRenderPath =
+#if GL_MINIMAL_RENDER_PATH
+        true;
+#else
+        false;
+#endif
+
+    /// <summary>EXT_shader_image_load_formatted. Images with no format qualifier.</summary>
+    public const bool ImageLoadFormatted =
+#if GL_HAS_IMAGE_LOAD_FORMATTED
+        true;
+#else
+        false;
+#endif
+
     /// <summary>ARB_bindless_texture. Texture handles instead of binding slots.</summary>
     public const bool BindlessTexture =
 #if GL_HAS_BINDLESS_TEXTURE

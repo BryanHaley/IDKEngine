@@ -23,8 +23,8 @@ void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    float specular = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
-    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
+    float specular = texelFetch(GBufferTex_MetallicRoughness, imgCoord, 0).r;
+    float depth = texelFetch(GBufferTex_Depth, imgCoord, 0).r;
     if (specular < 0.001 || depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -34,13 +34,13 @@ void main()
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
     
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjection);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    vec3 normal = DecodeUnitVec(texelFetch(GBufferTex_Normal, imgCoord, 0).rg);
     mat3 normalToView = mat3(transpose(perFrameDataUBO.InvView));
     normal = normalToView * normal;
 
     vec3 color = SSR(normal, fragPos) * specular;
 
-    vec3 albedo = texelFetch(gBufferDataUBO.Albedo, imgCoord, 0).rgb;
+    vec3 albedo = texelFetch(GBufferTex_Albedo, imgCoord, 0).rgb;
     color *= albedo;
 
     imageStore(ImgResult, imgCoord, vec4(color, 1.0));
@@ -67,7 +67,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
             return vec3(0.0);
         }
 
-        float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
+        float depth = texture(GBufferTex_Depth, projectedSample.xy).r;
         if (projectedSample.z > depth)
         {
             BinarySearch(samplePoint, deltaStep, projectedSample);
@@ -77,7 +77,7 @@ vec3 SSR(vec3 normal, vec3 fragPos)
     }
 
     vec3 worldSpaceReflectDir = (perFrameDataUBO.InvView * vec4(reflectDir, 0.0)).xyz;
-    return texture(skyBoxUBO.Albedo, worldSpaceReflectDir).rgb;
+    return texture(SkyBoxTex, worldSpaceReflectDir).rgb;
 }
 
 void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
@@ -90,7 +90,7 @@ void BinarySearch(vec3 samplePoint, vec3 deltaStep, inout vec3 projectedSample)
         projectedSample = PerspectiveTransform(samplePoint, perFrameDataUBO.Projection);
         projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
 
-        float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
+        float depth = texture(GBufferTex_Depth, projectedSample.xy).r;
 
         deltaStep *= 0.5;
         if (projectedSample.z > depth)

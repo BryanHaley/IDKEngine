@@ -192,13 +192,19 @@ public static partial class BBG
                     // The inserted code here is limited to preprocessor statements.
                     // This is to avoid "can't enable extension in middle of shader" error.
                     $"""
+                    #if {(GLCaps.BindlessTexture ? 1 : 0)}
                     #extension GL_ARB_bindless_texture : require
+                    #endif
+                    #if {(GLCaps.ImageLoadFormatted ? 1 : 0)}
                     #extension GL_EXT_shader_image_load_formatted : require
+                    #endif
 
                     #if {(EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE != null ? 1 : 0)}
                     #extension {EXTENSION_NAME_LINE_DIRECTIVE_SOURCEFILE} : enable
                     #endif
 
+                    #define APP_HAS_BINDLESS_TEXTURE {(GLCaps.BindlessTexture ? 1 : 0)}
+                    #define APP_MINIMAL_RENDER_PATH {(GLCaps.MinimalRenderPath ? 1 : 0)}
                     #define {GetShaderStageInsertion(shaderStage)} 1
                     #define {GetVendorInsertion()} 1
                     #define MIN_SUBGROUP_SIZE {GetMinSubgroupSize()}

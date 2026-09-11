@@ -21,7 +21,7 @@ float SSAO(vec3 fragPos, vec3 normal);
 void main()
 {
     ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);
-    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
+    float depth = texelFetch(GBufferTex_Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         imageStore(ImgResult, imgCoord, vec4(0.0));
@@ -29,7 +29,7 @@ void main()
     }
 
     vec2 uv = (imgCoord + 0.5) / imageSize(ImgResult);
-    vec3 normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
+    vec3 normal = DecodeUnitVec(texelFetch(GBufferTex_Normal, imgCoord, 0).rg);
     vec3 fragPos = PerspectiveTransformUvDepth(vec3(uv, depth), perFrameDataUBO.InvProjView);
 
     float occlusion = SSAO(fragPos, normal);
@@ -56,7 +56,7 @@ float SSAO(vec3 fragPos, vec3 normal)
         vec3 projectedSample = PerspectiveTransform(samplePos, perFrameDataUBO.ProjView);
         projectedSample.xy = projectedSample.xy * 0.5 + 0.5;
 
-        float depth = texture(gBufferDataUBO.Depth, projectedSample.xy).r;
+        float depth = texture(GBufferTex_Depth, projectedSample.xy).r;
         if (projectedSample.z > depth)
         {
             vec3 sampleToFrag = fragPos - samplePos;

@@ -25,7 +25,7 @@ void main()
 
     if (settingsUBO.IsNaiveTaa)
     {
-        vec2 velocity = texture(gBufferDataUBO.Velocity, uv).rg;
+        vec2 velocity = texture(GBufferTex_Velocity, uv).rg;
         vec2 historyUV = uv - velocity;
 
         vec3 currentColor = texture(SamplerCurrentColor, uv).rgb;
@@ -42,7 +42,7 @@ void main()
     vec4 currentColor, neighborhoodMin, neighborhoodMax;
     GetResolveData(imgCoord, currentColor, bestHistoryUv, neighborhoodMin, neighborhoodMax);
 
-    vec2 velocity = texture(gBufferDataUBO.Velocity, bestHistoryUv).rg;
+    vec2 velocity = texture(GBufferTex_Velocity, bestHistoryUv).rg;
     vec2 historyUV = uv - velocity;
     if (any(greaterThanEqual(historyUV, vec2(1.0))) || any(lessThan(historyUV, vec2(0.0))))
     {
@@ -84,7 +84,7 @@ void GetResolveData(ivec2 imgCoord, out vec4 currentColor, out vec2 neighborhood
             neighborhoodMin = min(neighborhoodMin, neighborColor);
             neighborhoodMax = max(neighborhoodMax, neighborColor);
             
-            float inputDepth = texture(gBufferDataUBO.Depth, uv).r;
+            float inputDepth = texture(GBufferTex_Depth, uv).r;
             if (inputDepth < minDepth)
             {
                 minDepth = inputDepth;

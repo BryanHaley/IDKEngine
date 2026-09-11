@@ -128,7 +128,8 @@ abstract unsafe class GameWindowBase : IDisposable
         window = GLFW.CreateWindow(_framebufferSize.X, _framebufferSize.Y, _title, null, null);
         if (window == null)
         {
-            Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed. Make sure the primary GPU has OpenGL {openglMajor}.{openglMinor} support");
+            OpenTK.Windowing.GraphicsLibraryFramework.GLFW.GetError(out string glfwErr);
+            Logger.Log(Logger.LogLevel.Fatal, $"Window creation failed ({glfwErr}). Make sure the primary GPU has OpenGL {openglMajor}.{openglMinor} support");
             Environment.Exit(0);
         }
 

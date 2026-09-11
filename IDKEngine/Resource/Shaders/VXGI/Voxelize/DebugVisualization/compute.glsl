@@ -25,7 +25,7 @@ void main()
     float t1, t2;
     if (!(RayBoxIntersect(worldRay, Box(voxelizerDataUBO.GridMin, voxelizerDataUBO.GridMax), t1, t2) && t2 > 0.0))
     {
-        vec4 skyColor = texture(skyBoxUBO.Albedo, worldRay.Direction);
+        vec4 skyColor = texture(SkyBoxTex, worldRay.Direction);
         imageStore(ImgResult, imgCoord, skyColor);
         return;
     }
@@ -41,7 +41,7 @@ void main()
     }
 
     vec4 color = TraceCone(SamplerVoxels, worldRay, ConeAngle, StepMultiplier);
-    color += (1.0 - color.a) * texture(skyBoxUBO.Albedo, worldRay.Direction);
+    color += (1.0 - color.a) * texture(SkyBoxTex, worldRay.Direction);
 
     imageStore(ImgResult, imgCoord, color);
 }

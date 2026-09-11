@@ -32,10 +32,16 @@ layout(std140, binding = 4) uniform TaaDataUBO
     ENUM_ANTI_ALIASING_MODE TemporalAntiAliasingMode;
 } taaDataUBO;
 
+#if APP_HAS_BINDLESS_TEXTURE
 layout(std140, binding = 5) uniform SkyBoxUBO
 {
     samplerCube Albedo;
 } skyBoxUBO;
+#define SkyBoxTex skyBoxUBO.Albedo
+#else
+// no bindless: the same textures, bound to fixed units by the client
+layout(binding = 14) uniform samplerCube SkyBoxTex;
+#endif
 
 layout(std140, binding = 6) uniform VoxelizerDataUBO
 {
@@ -45,6 +51,7 @@ layout(std140, binding = 6) uniform VoxelizerDataUBO
     float _pad1;
 } voxelizerDataUBO;
 
+#if APP_HAS_BINDLESS_TEXTURE
 layout(std140, binding = 7) uniform GBufferDataUBO
 {
     sampler2D Albedo;
@@ -54,3 +61,17 @@ layout(std140, binding = 7) uniform GBufferDataUBO
     sampler2D Velocity;
     sampler2D Depth;
 } gBufferDataUBO;
+#define GBufferTex_Albedo            gBufferDataUBO.Albedo
+#define GBufferTex_Normal            gBufferDataUBO.Normal
+#define GBufferTex_MetallicRoughness gBufferDataUBO.MetallicRoughness
+#define GBufferTex_Emissive          gBufferDataUBO.Emissive
+#define GBufferTex_Velocity          gBufferDataUBO.Velocity
+#define GBufferTex_Depth             gBufferDataUBO.Depth
+#else
+layout(binding = 8)  uniform sampler2D GBufferTex_Albedo;
+layout(binding = 9)  uniform sampler2D GBufferTex_Normal;
+layout(binding = 10) uniform sampler2D GBufferTex_MetallicRoughness;
+layout(binding = 11) uniform sampler2D GBufferTex_Emissive;
+layout(binding = 12) uniform sampler2D GBufferTex_Velocity;
+layout(binding = 13) uniform sampler2D GBufferTex_Depth;
+#endif

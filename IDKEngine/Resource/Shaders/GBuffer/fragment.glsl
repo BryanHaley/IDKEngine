@@ -51,7 +51,7 @@ void main()
     OutMetallicRoughness = vec2(surface.Metallic, surface.Roughness);
     OutEmissive = surface.Emissive;
 
-    vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);
+    vec2 uv = gl_FragCoord.xy / textureSize(GBufferTex_Velocity, 0);
     vec2 thisNdc = (uv * 2.0 - 1.0) - taaDataUBO.Jitter;
     vec2 historyNdc = inData.PrevClipPos.xy / inData.PrevClipPos.w;
     OutVelocity = (thisNdc - historyNdc) * 0.5; // transformed to UV space [0, 1], + 0.5 cancels out

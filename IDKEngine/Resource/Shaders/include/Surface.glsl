@@ -50,7 +50,11 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
 {
     Surface surface;
 
-#if APP_SHADER_STAGE_FRAGMENT
+#if !APP_HAS_BINDLESS_TEXTURE
+    // No bindless, so no per-material textures. The factors still carry the
+    // material's own colour, which is enough to tell the surfaces apart.
+    vec4 baseColorAndAlpha = DecompressUR8G8B8A8(gpuMaterial.BaseColorFactor);
+#elif APP_SHADER_STAGE_FRAGMENT
     vec4 baseColorAndAlpha = texture(gpuMaterial.BaseColor, uv, baseColorLodBias) * DecompressUR8G8B8A8(gpuMaterial.BaseColorFactor);
 #else
     // Normally the GL does not try to compute automatic derivatives in shaders other than fragment.
@@ -61,13 +65,24 @@ Surface GetSurface(GpuMaterial gpuMaterial, vec2 uv, float baseColorLodBias)
     surface.Albedo = baseColorAndAlpha.rgb;
     surface.Alpha = baseColorAndAlpha.a;
 
+#if APP_HAS_BINDLESS_TEXTURE
     surface.Normal = ReconstructPackedNormal(texture(gpuMaterial.Normal, uv).rg);
     surface.Emissive = texture(gpuMaterial.Emissive, uv).rgb * gpuMaterial.EmissiveFactor;
+#else
+    surface.Normal = vec3(0.0);   // zero means "use the geometric normal"
+    surface.Emissive = gpuMaterial.EmissiveFactor;
+#endif
     surface.Absorbance = gpuMaterial.Absorbance;
 
+#if APP_HAS_BINDLESS_TEXTURE
     surface.Metallic = texture(gpuMaterial.MetallicRoughness, uv).r * gpuMaterial.MetallicFactor;
     surface.Roughness = texture(gpuMaterial.MetallicRoughness, uv).g * gpuMaterial.RoughnessFactor;
     surface.Transmission = texture(gpuMaterial.Transmission, uv).r * gpuMaterial.TransmissionFactor;
+#else
+    surface.Metallic = gpuMaterial.MetallicFactor;
+    surface.Roughness = gpuMaterial.RoughnessFactor;
+    surface.Transmission = gpuMaterial.TransmissionFactor;
+#endif
     surface.IOR = gpuMaterial.IOR;
 
     surface.AlphaCutoff = gpuMaterial.AlphaCutoff;

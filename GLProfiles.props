@@ -41,6 +41,7 @@
       GL_HAS_ANISOTROPIC_FILTER;
       GL_HAS_SPIRV;
       GL_HAS_BINDLESS_TEXTURE;
+      GL_HAS_IMAGE_LOAD_FORMATTED;
       GL_HAS_SHADER_VIEWPORT_LAYER;
       GL_HAS_SHADING_LANGUAGE_INCLUDE;
       GL_HAS_SHADING_LANGUAGE_420PACK;
@@ -83,19 +84,37 @@
   </PropertyGroup>
 
   <!--
-    MGL. Add a symbol here the day the feature passes its test, never before:
+    MGL. Add a symbol here the day the feature starts working, never before:
     a feature listed here that does not work turns a clean "disabled" message
-    into a crash.
+    into a crash. Everything below survives a full IDKEngine benchmark run.
+
+    Still missing, and the reason the picture is not right yet:
+    GL_HAS_BINDLESS_TEXTURE, GL_HAS_SUBGROUP, GL_HAS_MESH_SHADER,
+    GL_HAS_SPIRV, GL_HAS_DEBUG_OUTPUT and the NVIDIA-only extensions.
   -->
   <PropertyGroup Condition="'$(GLProfile)' == 'MGL'">
     <GLCaps>
       GL_HAS_TEXTURE_STORAGE;
-      GL_HAS_DSA;
+      GL_HAS_IMAGE_LOAD_STORE;
+      GL_HAS_ATOMIC_COUNTERS;
+      GL_HAS_COMPUTE_SHADER;
+      GL_HAS_SSBO;
+      GL_HAS_MULTI_DRAW_INDIRECT;
+      GL_HAS_TEXTURE_VIEW;
+      GL_HAS_INVALIDATE_SUBDATA;
       GL_HAS_BUFFER_STORAGE;
+      GL_HAS_DSA;
+      GL_HAS_CLIP_CONTROL;
+      GL_HAS_TEXTURE_BARRIER;
+      GL_HAS_POLYGON_OFFSET_CLAMP;
       GL_HAS_ANISOTROPIC_FILTER;
+      GL_HAS_SHADING_LANGUAGE_420PACK;
+      GL_HAS_VERTEX_ATTRIB_BINDING;
+      GL_HAS_SEAMLESS_CUBEMAP_PER_TEXTURE;
       HAS_OIDN;
       GL_CONTEXT_4_6;
-      GL_CORE_PROFILE_ONLY
+      GL_CORE_PROFILE_ONLY;
+      GL_MINIMAL_RENDER_PATH
     </GLCaps>
   </PropertyGroup>
 

@@ -108,7 +108,13 @@ class Application : GameWindowBase
     private Gui gui;
     public bool IsBloom = true;
     public bool IsVolumetricLighting = true;
+#if GL_MINIMAL_RENDER_PATH
+    // the GUI is its own render path; on the bare pipeline the frame goes
+    // straight to the swapchain
+    public bool RenderImGui = false;
+#else
     public bool RenderImGui = true;
+#endif
 
     // All models and all lights and Camera (the types of different entities)
     public ModelManager ModelManager;
@@ -198,6 +204,9 @@ class Application : GameWindowBase
             }
             else
             {
+#if GL_MINIMAL_RENDER_PATH
+                TonemapAndGamma.Compute(RasterizerPipeline.Result);
+#else
                 if (IsBloom)
                 {
                     Bloom.Compute(RasterizerPipeline.Result);
@@ -210,6 +219,7 @@ class Application : GameWindowBase
 
                 TonemapAndGamma.Compute(RasterizerPipeline.Result, IsBloom ? Bloom.Result : null, IsVolumetricLighting ? VolumetricLight.Result : null);
                 RasterizerPipeline.LightingVRS.DebugRender(TonemapAndGamma.Result);
+#endif
             }
         }
 
@@ -278,6 +288,14 @@ class Application : GameWindowBase
         {
             BBG.Rendering.CopyTextureToSwapchain(TonemapAndGamma.Result);
         }
+
+        if (benchmark != null && RenderMode_ == RenderMode.Rasterizer)
+        {
+            benchmark.CaptureTexture(RasterizerPipeline.AlbedoTexture, "albedo");
+            benchmark.CaptureTexture(RasterizerPipeline.Result, "lit");
+            benchmark.CaptureTexture(TonemapAndGamma.Result, "tonemap");
+        }
+        benchmark?.CaptureIfRequested(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
         SwapBuffers();
         PollEvents();

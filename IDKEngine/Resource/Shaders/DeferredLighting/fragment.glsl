@@ -24,12 +24,18 @@ void main()
     ivec2 imgCoord = ivec2(gl_FragCoord.xy);
     vec2 uv = inData.TexCoord;
     
-    float depth = texelFetch(gBufferDataUBO.Depth, imgCoord, 0).r;
+    float depth = texelFetch(GBufferTex_Depth, imgCoord, 0).r;
     if (depth == 1.0)
     {
         OutFragColor = vec3(0.0);
         return;
     }
+
+#if APP_MINIMAL_RENDER_PATH
+    // flat, unlit: whatever the G-Buffer holds, shaded by nothing
+    OutFragColor = texelFetch(GBufferTex_Albedo, imgCoord, 0).rgb;
+    return;
+#endif
     
     // InitializeRandomSeed((imgCoord.y * 4096 + imgCoord.x) * (perFrameDataUBO.Frame + 1));
 
@@ -40,11 +46,11 @@ void main()
     float ambientOcclusion = texelFetch(SamplerAO, imgCoord, 0).r;
 
     Surface surface = GetDefaultSurface();
-    surface.Albedo = texelFetch(gBufferDataUBO.Albedo, imgCoord, 0).rgb;
-    surface.Normal = DecodeUnitVec(texelFetch(gBufferDataUBO.Normal, imgCoord, 0).rg);
-    surface.Metallic = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).r;
-    surface.Roughness = texelFetch(gBufferDataUBO.MetallicRoughness, imgCoord, 0).g;
-    surface.Emissive = texelFetch(gBufferDataUBO.Emissive, imgCoord, 0).rgb;
+    surface.Albedo = texelFetch(GBufferTex_Albedo, imgCoord, 0).rgb;
+    surface.Normal = DecodeUnitVec(texelFetch(GBufferTex_Normal, imgCoord, 0).rg);
+    surface.Metallic = texelFetch(GBufferTex_MetallicRoughness, imgCoord, 0).r;
+    surface.Roughness = texelFetch(GBufferTex_MetallicRoughness, imgCoord, 0).g;
+    surface.Emissive = texelFetch(GBufferTex_Emissive, imgCoord, 0).rgb;
     surface.IOR = 1.0;
 
     vec3 directLighting = vec3(0.0);
@@ -69,7 +75,11 @@ void main()
             else if (ShadowMode == ENUM_SHADOW_MODE_RAY_TRACED)
             {
                 GpuPointShadow pointShadow = shadowsUBO.PointShadows[light.PointShadowIndex];
+#if APP_HAS_BINDLESS_TEXTURE
                 float visibility = imageLoad(image2D(pointShadow.RayTracedShadowMapImage), imgCoord).r;
+#else
+                float visibility = 1.0;
+#endif
                 contribution *= visibility;
             }
         }

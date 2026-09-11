@@ -69,7 +69,7 @@ void main()
         surface.Normal = -surface.Normal;
     }
 
-    vec2 uv = gl_FragCoord.xy / textureSize(gBufferDataUBO.Velocity, 0);
+    vec2 uv = gl_FragCoord.xy / textureSize(GBufferTex_Velocity, 0);
     vec3 ndc = vec3(uv * 2.0 - 1.0, gl_FragCoord.z);
     vec3 fragPos = PerspectiveTransform(vec3(ndc.xy, ndc.z), perFrameDataUBO.InvProjView);
     vec3 unjitteredFragPos = PerspectiveTransform(vec3(ndc.xy - taaDataUBO.Jitter, ndc.z), perFrameDataUBO.InvProjView);

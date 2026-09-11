@@ -237,6 +237,9 @@ unsafe class ImGuiBackend : IDisposable
 
     private void CreateDeviceObjects()
     {
+        // match the context: the layout qualifiers below need more than 4.1
+        string GlslVersion = $"#version {BBOpenGL.GLCaps.VersionMajor}{BBOpenGL.GLCaps.VersionMinor}0 core";
+
 #if GL_HAS_SHADING_LANGUAGE_420PACK
         string ProjectionLayout = $"layout(location = {glProjectionUniformLocation}) ";
         string SamplerLayout = $"layout(binding = {glFontTextureUnit}) ";
@@ -249,7 +252,7 @@ unsafe class ImGuiBackend : IDisposable
 
         string vertexSource = 
             $$"""
-            #version 410 core
+            {{GlslVersion}}
             
             {{ProjectionLayout}}uniform mat4 Projection;
             
@@ -273,7 +276,7 @@ unsafe class ImGuiBackend : IDisposable
 
         string fragmentSource = 
             $$"""
-            #version 410 core
+            {{GlslVersion}}
 
             layout(location = 0) out vec4 FragColor;
             {{SamplerLayout}}uniform sampler2D SamplerFont;

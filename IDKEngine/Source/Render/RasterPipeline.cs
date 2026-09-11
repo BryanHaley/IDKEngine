@@ -245,24 +245,45 @@ class RasterPipeline : IDisposable
         mergeLightingProgram = new BBG.AbstractShaderProgram(BBG.AbstractShader.FromFile(BBG.ShaderStage.Compute, "MergeTextures/compute.glsl"));
 
         IsWireframe = false;
-        IsSSAO = true;
         IsSSR = false;
         IsVariableRateShading = false;
         IsVXGI = false;
-        GenerateShadowMaps = true;
         GridReVoxelize = true;
 
         RayTracingSamples = 1;
-        ShadowMode_ = ShadowMode.Pcf;
 
         TAAEnableMipBias = true;
         TAASamples = 6;
         TAAAdditionalMipBias = 0.25f;
+
+#if GL_MINIMAL_RENDER_PATH
+        IsSSAO = false;
+        GenerateShadowMaps = false;
+        IsHiZCulling = false;
+        ShadowMode_ = ShadowMode.None;
+        AntiAliasingMode_ = AntiAliasingMode.None;
+#else
+        IsSSAO = true;
+        GenerateShadowMaps = true;
+        ShadowMode_ = ShadowMode.Pcf;
         AntiAliasingMode_ = AntiAliasingMode.TAA;
+#endif
     }
 
     public void Render(ModelManager modelManager, LightManager lightManager, Camera camera, float dT)
     {
+#if !GL_HAS_BINDLESS_TEXTURE
+        // Without bindless the shaders read the GBuffer off fixed texture units
+        // instead of out of a uniform block. Nothing else binds this high, so
+        // once a frame is enough.
+        BBG.Cmd.BindTextureUnit(AlbedoTexture, 8);
+        BBG.Cmd.BindTextureUnit(NormalTexture, 9);
+        BBG.Cmd.BindTextureUnit(MetallicRoughnessTexture, 10);
+        BBG.Cmd.BindTextureUnit(EmissiveTexture, 11);
+        BBG.Cmd.BindTextureUnit(VelocityTexture, 12);
+        BBG.Cmd.BindTextureUnit(DepthTexture, 13);
+        if (SkyBoxManager.SkyBoxTexture != null) BBG.Cmd.BindTextureUnit(SkyBoxManager.SkyBoxTexture, 14);
+#endif
         // Update Temporal AntiAliasing stuff
         {
             gpuTaaData.MipmapBias = 0.0f;
@@ -367,6 +388,19 @@ class RasterPipeline : IDisposable
             bool faceCulling = !IsWireframe && !doubleSided;
             BBG.Rendering.AttachmentLoadOp loadOp = i == 0 ? BBG.Rendering.AttachmentLoadOp.Clear : BBG.Rendering.AttachmentLoadOp.Load;
 
+
+#if GL_MINIMAL_RENDER_PATH
+            // no GPU culling: every mesh draws, so a wrong instance count
+            // cannot be why the screen is empty
+            if (i == 0)
+            {
+                for (int m = 0; m < modelManager.DrawCommands.Length; m++)
+                {
+                    modelManager.DrawCommands[m].InstanceCount = modelManager.Meshes[m].InstanceCount;
+                }
+                modelManager.UploadDrawCommandBuffer(0, modelManager.DrawCommands.Length);
+            }
+#else
             BBG.Computing.Compute("Culling for Camera", () =>
             {
                 modelManager.ResetInstanceCounts();
@@ -377,6 +411,7 @@ class RasterPipeline : IDisposable
                 BBG.Computing.Dispatch(MyMath.DivUp(modelManager.MeshInstances.Length, 64), 1, 1);
                 BBG.Cmd.MemoryBarrier(BBG.Cmd.MemoryBarrierMask.CommandBarrierBit);
             });
+#endif
 
             BBG.Rendering.Render("Fill G-Buffer", new BBG.Rendering.RenderAttachments()
             {
@@ -461,6 +496,12 @@ class RasterPipeline : IDisposable
             BBG.Rendering.InferViewportSize();
             BBG.Rendering.DrawNonIndexed(BBG.Rendering.Topology.Triangles, 0, 3);
         });
+
+#if GL_MINIMAL_RENDER_PATH
+        // lights, skybox, transparency, SSR and TAA all wait on features that
+        // are not up yet; the G-Buffer and the lighting pass are the frame
+        return;
+#endif
 
         BBG.Rendering.Render("Draw lights", new BBG.Rendering.RenderAttachments()
         {
