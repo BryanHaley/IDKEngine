@@ -181,7 +181,16 @@ public static partial class BBG
                 {
                     WarnNoPersistentMapping();
                     shadow = NativeMemory.Alloc((nuint)size);
-                    NativeMemory.Clear(shadow, (nuint)size);
+                    if (data != null)
+                    {
+                        // Copy initial data into the shadow so callers who read
+                        // through Memory (e.g. the BVH builder) see real data.
+                        NativeMemory.Copy(data, shadow, (nuint)size);
+                    }
+                    else
+                    {
+                        NativeMemory.Clear(shadow, (nuint)size);
+                    }
                     Memory = shadow;
                 }
 #endif

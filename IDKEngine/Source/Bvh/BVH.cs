@@ -460,11 +460,17 @@ public class BVH : IDisposable
         if (true)
         {
             double totalSAH = 0.0f;
+            int maxDepth = 0;
+            int totalNodes = 0;
             for (int i = start; i < start + count; i++)
             {
                 totalSAH += BLAS.ComputeGlobalSAH(GetBlas(i), buildSettings);
+                int d = BLAS.ComputeTreeDepth(GetBlas(i));
+                if (d > maxDepth) maxDepth = d;
+                totalNodes += BlasesDesc[i].NodeCount;
             }
             Logger.Log(Logger.LogLevel.Info, $"Added SAH of all new BLAS'es = {totalSAH}");
+            Logger.Log(Logger.LogLevel.Info, $"BLAS tree max depth = {maxDepth}, total nodes = {totalNodes}");
             //Logger.Log(Logger.LogLevel.Info, $"Added EPO of all new BLAS'es = {BLAS.ComputeGlobalEPO(GetBlas(0), GetBlasGeometry(BlasesDesc[0]), buildSettings)}");
         }
     }
