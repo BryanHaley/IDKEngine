@@ -23,6 +23,8 @@ namespace IDKEngine;
 ///                          the same thing
 ///   --benchmark-shot PATH  save the last measured frame as a .bmp, so a run
 ///                          says what it drew and not only how fast
+///   --benchmark-vsync      keep waiting for the display, which pins every
+///                          frame to the refresh rate
 ///   --width N --height N   fixed framebuffer size
 /// </summary>
 class Benchmark
@@ -35,6 +37,7 @@ class Benchmark
     public readonly string ShotPath;
     public readonly int Width = 1600;
     public readonly int Height = 800;
+    public readonly bool VSync;
 
     private readonly double[] frameTimesMs;
     private readonly Stopwatch stopwatch = new Stopwatch();
@@ -50,6 +53,10 @@ class Benchmark
         OutputPath = StringArg(args, "--benchmark-out", null);
         ReplayPath = StringArg(args, "--benchmark-replay", null);
         ShotPath = StringArg(args, "--benchmark-shot", null);
+
+        // Waiting for the display makes every frame the same length and says
+        // nothing about the driver, so a run measures without it unless asked
+        VSync = Array.IndexOf(args, "--benchmark-vsync") >= 0;
         Width = IntArg(args, "--width", 1600);
         Height = IntArg(args, "--height", 800);
 

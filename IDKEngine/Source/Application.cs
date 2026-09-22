@@ -556,7 +556,7 @@ class Application : GameWindowBase
 
         MouseState.CursorMode = CursorModeValue.CursorNormal;
         FrameStateRecorder = new StateRecorder<FrameState>();
-        WindowVSync = true;
+        WindowVSync = benchmark == null || benchmark.VSync;
         TimeEnabled = true;
     }
 
