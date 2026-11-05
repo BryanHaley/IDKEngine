@@ -115,8 +115,7 @@
       GL_HAS_IMAGE_LOAD_FORMATTED;
       HAS_OIDN;
       GL_CONTEXT_4_6;
-      GL_CORE_PROFILE_ONLY;
-      GL_MINIMAL_RENDER_PATH
+      GL_CORE_PROFILE_ONLY
     </GLCaps>
   </PropertyGroup>
 

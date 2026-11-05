@@ -562,8 +562,44 @@ public static partial class BBG
 
         public static void DrawNonIndexed(Topology topology, int first, int count, int instanceCount = 1, uint baseInstance = 0)
         {
+#if GL_CORE_PROFILE_ONLY
+            // core GL has no quads; an indexed draw keeps gl_VertexID as the quad's own vertex
+            if (topology == Topology.Quads)
+            {
+                DrawQuadsAsTriangles(first, count, instanceCount, baseInstance);
+                return;
+            }
+#endif
             GL.DrawArraysInstancedBaseInstance((PrimitiveType)topology, first, count, instanceCount, baseInstance);
         }
+
+#if GL_CORE_PROFILE_ONLY
+        private static int quadIndexBuffer;
+        private static int quadIndexCount;
+
+        private static void DrawQuadsAsTriangles(int first, int count, int instanceCount, uint baseInstance)
+        {
+            int quads = count / 4;
+            if (quads * 6 > quadIndexCount)
+            {
+                uint[] indices = new uint[quads * 6];
+                for (int q = 0; q < quads; q++)
+                {
+                    uint b = (uint)q * 4;
+                    indices[q * 6 + 0] = b; indices[q * 6 + 1] = b + 1; indices[q * 6 + 2] = b + 2;
+                    indices[q * 6 + 3] = b; indices[q * 6 + 4] = b + 2; indices[q * 6 + 5] = b + 3;
+                }
+                if (quadIndexBuffer == 0) GL.CreateBuffers(1, ref quadIndexBuffer);
+                GL.NamedBufferData(quadIndexBuffer, indices.Length * sizeof(uint), indices, BufferUsage.StaticDraw);
+                quadIndexCount = indices.Length;
+            }
+
+            int previous = GL.GetInteger(GetPName.ElementArrayBufferBinding);
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, quadIndexBuffer);
+            GL.DrawElementsInstancedBaseVertexBaseInstance(PrimitiveType.Triangles, quads * 6, DrawElementsType.UnsignedInt, 0, instanceCount, first, baseInstance);
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, previous);
+        }
+#endif
 
         public static void MultiDrawNonIndexed(Buffer drawCommandBuffer, Topology topology, int drawCount, int stride, nint bufferOffset = 0)
         {
