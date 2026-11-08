@@ -49,7 +49,7 @@ void main()
     GpuMeshletInfo meshletInfo = meshletInfoSSBO.MeshletsInfo[workgroupThisMeshlet];
     
     mat4 projView = shadowsUBO.PointShadows[ShadowIndex].ProjViewMatrices[faceId];
-    mat4 modelMatrix = mat4(meshInstanceSSBO.MeshInstances[meshInstanceId].ModelMatrix);
+    mat4 modelMatrix = mat4(meshTransformSSBO.Transforms[meshInstance.MeshTransformId].ModelMatrix);
 
     Frustum frustum = GetFrustum(projView * modelMatrix);
     bool isVisible = FrustumBoxIntersect(frustum, Box(meshletInfo.Min, meshletInfo.Max));

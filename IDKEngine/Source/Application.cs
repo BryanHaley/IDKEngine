@@ -137,6 +137,7 @@ class Application : GameWindowBase
     private float animationTime;
 
     private readonly Benchmark benchmark;
+    private int debugDumpBuffer;
 
     public Application(int width, int height, string title, Benchmark benchmark = null)
         : base(width, height, title, BBOpenGL.GLCaps.VersionMajor, BBOpenGL.GLCaps.VersionMinor)
@@ -294,6 +295,20 @@ class Application : GameWindowBase
             benchmark.CaptureTexture(RasterizerPipeline.AlbedoTexture, "albedo");
             benchmark.CaptureTexture(RasterizerPipeline.Result, "lit");
             benchmark.CaptureTexture(TonemapAndGamma.Result, "tonemap");
+            if (debugDumpBuffer != 0)
+            {
+                OpenTK.Graphics.OpenGL.GL.Finish();
+                byte[] bytes = new byte[16 << 20];
+                OpenTK.Graphics.OpenGL.GL.GetNamedBufferSubData(debugDumpBuffer, IntPtr.Zero, bytes.Length, bytes);
+                System.IO.File.WriteAllBytes(Environment.GetEnvironmentVariable("IDK_MESH_DUMP"), bytes);
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                if (LightManager.TryGetPointShadow(i, out CpuPointShadow shadow))
+                {
+                    benchmark.CaptureCubeDepth(shadow.ShadowMap, $"shadow{i}");
+                }
+            }
         }
         benchmark?.CaptureIfRequested(WindowFramebufferSize.X, WindowFramebufferSize.Y);
 
@@ -552,6 +567,24 @@ class Application : GameWindowBase
 
             //LightManager.AddLight(new CpuLight(new Vector3(-6.256f, 8.415f, -0.315f), new Vector3(820.0f, 560.0f, 586.0f), 0.3f));
             //LightManager.CreatePointShadowForLight(new CpuPointShadow(512, WindowFramebufferSize, new Vector2(0.1f, 60.0f)), 0);
+        }
+
+        if (Environment.GetEnvironmentVariable("IDK_MESH_DUMP") != null)
+        {
+            int dbg = 0;
+            OpenTK.Graphics.OpenGL.GL.CreateBuffers(1, ref dbg);
+            OpenTK.Graphics.OpenGL.GL.NamedBufferStorage(dbg, 16 << 20, IntPtr.Zero, OpenTK.Graphics.OpenGL.BufferStorageMask.DynamicStorageBit);
+            OpenTK.Graphics.OpenGL.GL.BindBufferBase(OpenTK.Graphics.OpenGL.BufferTarget.ShaderStorageBuffer, 30, dbg);
+            debugDumpBuffer = dbg;
+        }
+        if (benchmark != null)
+        {
+            RasterizerPipeline.TakeMeshShaderPath = benchmark.MeshCamera;
+            CpuPointShadow.TakeMeshShaderPath = benchmark.MeshShadow;
+        }
+        if (benchmark != null && benchmark.PathTracer)
+        {
+            SetRenderMode(RenderMode.PathTracer, WindowFramebufferSize, WindowFramebufferSize);
         }
 
         MouseState.CursorMode = CursorModeValue.CursorNormal;

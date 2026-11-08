@@ -26,6 +26,9 @@ namespace IDKEngine;
 ///   --benchmark-vsync      keep waiting for the display, which pins every
 ///                          frame to the refresh rate
 ///   --width N --height N   fixed framebuffer size
+///   --benchmark-pathtracer measure the path tracer instead of the rasterizer
+///   --benchmark-mesh       rasterize through the mesh shader path; -camera
+///                          or -shadow for just one of the two passes
 /// </summary>
 class Benchmark
 {
@@ -38,6 +41,9 @@ class Benchmark
     public readonly int Width = 1600;
     public readonly int Height = 800;
     public readonly bool VSync;
+    public readonly bool PathTracer;
+    public readonly bool MeshCamera;
+    public readonly bool MeshShadow;
 
     private readonly double[] frameTimesMs;
     private readonly Stopwatch stopwatch = new Stopwatch();
@@ -59,6 +65,10 @@ class Benchmark
         VSync = Array.IndexOf(args, "--benchmark-vsync") >= 0;
         Width = IntArg(args, "--width", 1600);
         Height = IntArg(args, "--height", 800);
+        PathTracer = Array.IndexOf(args, "--benchmark-pathtracer") >= 0;
+        bool mesh = Array.IndexOf(args, "--benchmark-mesh") >= 0;
+        MeshCamera = mesh || Array.IndexOf(args, "--benchmark-mesh-camera") >= 0;
+        MeshShadow = mesh || Array.IndexOf(args, "--benchmark-mesh-shadow") >= 0;
 
         frameTimesMs = new double[Math.Max(MeasureFrames, 0)];
     }
@@ -133,6 +143,37 @@ class Benchmark
         OpenTK.Graphics.OpenGL.GL.DeleteFramebuffers(1, ref fbo);
 
         WriteBmp(Path.ChangeExtension(ShotPath, null) + "_" + suffix + ".bmp", pixels, w, h);
+    }
+
+    /// <summary>Each face of a depth cube map as raw floats, for comparing shadow maps.</summary>
+    public void CaptureCubeDepth(BBOpenGL.BBG.Texture texture, string suffix)
+    {
+        if (!wantsCapture || ShotPath == null || texture == null)
+        {
+            return;
+        }
+
+        int w = texture.Width, h = texture.Height;
+        float[] depth = new float[w * h];
+
+        OpenTK.Graphics.OpenGL.GL.Finish();
+        int fbo = 0;
+        OpenTK.Graphics.OpenGL.GL.CreateFramebuffers(1, ref fbo);
+        using var file = File.Create(Path.ChangeExtension(ShotPath, null) + "_" + suffix + ".f32");
+        for (int face = 0; face < 6; face++)
+        {
+            OpenTK.Graphics.OpenGL.GL.NamedFramebufferTextureLayer(fbo,
+                OpenTK.Graphics.OpenGL.FramebufferAttachment.DepthAttachment, texture.ID, 0, face);
+            OpenTK.Graphics.OpenGL.GL.BindFramebuffer(OpenTK.Graphics.OpenGL.FramebufferTarget.Framebuffer, fbo);
+            OpenTK.Graphics.OpenGL.GL.ReadPixels(0, 0, w, h,
+                OpenTK.Graphics.OpenGL.PixelFormat.DepthComponent,
+                OpenTK.Graphics.OpenGL.PixelType.Float, depth);
+            byte[] bytes = new byte[depth.Length * 4];
+            Buffer.BlockCopy(depth, 0, bytes, 0, bytes.Length);
+            file.Write(bytes);
+        }
+        OpenTK.Graphics.OpenGL.GL.BindFramebuffer(OpenTK.Graphics.OpenGL.FramebufferTarget.Framebuffer, 0);
+        OpenTK.Graphics.OpenGL.GL.DeleteFramebuffers(1, ref fbo);
     }
 
     private static void WriteBmp(string path, byte[] rgba, int width, int height)

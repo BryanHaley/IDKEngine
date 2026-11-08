@@ -89,8 +89,7 @@
     into a crash. Everything below survives a full IDKEngine benchmark run.
 
     Still missing, and the reason the picture is not right yet:
-    GL_HAS_SUBGROUP, GL_HAS_MESH_SHADER, GL_HAS_SPIRV, GL_HAS_DEBUG_OUTPUT
-    and the NVIDIA-only extensions.
+    the NVIDIA-only extensions other than mesh shaders.
   -->
   <PropertyGroup Condition="'$(GLProfile)' == 'MGL'">
     <GLCaps>
@@ -113,6 +112,11 @@
       GL_HAS_SEAMLESS_CUBEMAP_PER_TEXTURE;
       GL_HAS_BINDLESS_TEXTURE;
       GL_HAS_IMAGE_LOAD_FORMATTED;
+      GL_HAS_SUBGROUP;
+      GL_HAS_SHADER_VIEWPORT_LAYER;
+      GL_HAS_DEBUG_OUTPUT;
+      GL_HAS_SPIRV;
+      GL_HAS_MESH_SHADER;
       HAS_OIDN;
       GL_CONTEXT_4_6;
       GL_CORE_PROFILE_ONLY
