@@ -132,6 +132,19 @@
     <GLCaps>$(GLCaps);HAS_KTX2;HAS_MESHOPTIMIZER</GLCaps>
   </PropertyGroup>
 
+  <!--
+    MGL's macOS build of the FSR 2 bindings, which carries MGL's FSR 2 on
+    MetalFX. Made by MGL's tools/fsr2_csharp/build.sh; off until it exists.
+  -->
+  <PropertyGroup>
+    <MGLNuGetDir>$(MSBuildThisFileDirectory)../../build/nuget</MGLNuGetDir>
+    <FfxFsr2Version>1.0.3</FfxFsr2Version>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GLProfile)' == 'MGL' And Exists('$(MGLNuGetDir)/FFX_FSR2.1.0.3-macos.nupkg')">
+    <FfxFsr2Version>1.0.3-macos</FfxFsr2Version>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MGLNuGetDir)</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
   <PropertyGroup>
     <GLCapsFlat>$([System.Text.RegularExpressions.Regex]::Replace($(GLCaps), '\s', ''))</GLCapsFlat>
     <DefineConstants>$(DefineConstants);$(GLCapsFlat)</DefineConstants>

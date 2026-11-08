@@ -29,6 +29,9 @@ namespace IDKEngine;
 ///   --benchmark-pathtracer measure the path tracer instead of the rasterizer
 ///   --benchmark-mesh       rasterize through the mesh shader path; -camera
 ///                          or -shadow for just one of the two passes
+///   --benchmark-aa MODE    None, TAA or FSR2
+///   --benchmark-scale F    render at F times the window size, as the
+///                          resolution scale slider does
 /// </summary>
 class Benchmark
 {
@@ -44,6 +47,8 @@ class Benchmark
     public readonly bool PathTracer;
     public readonly bool MeshCamera;
     public readonly bool MeshShadow;
+    public readonly string AntiAliasing;
+    public readonly float RenderScale;
 
     private readonly double[] frameTimesMs;
     private readonly Stopwatch stopwatch = new Stopwatch();
@@ -69,6 +74,8 @@ class Benchmark
         bool mesh = Array.IndexOf(args, "--benchmark-mesh") >= 0;
         MeshCamera = mesh || Array.IndexOf(args, "--benchmark-mesh-camera") >= 0;
         MeshShadow = mesh || Array.IndexOf(args, "--benchmark-mesh-shadow") >= 0;
+        AntiAliasing = StringArg(args, "--benchmark-aa", null);
+        RenderScale = float.TryParse(StringArg(args, "--benchmark-scale", null), NumberStyles.Float, CultureInfo.InvariantCulture, out float scale) ? scale : 0.0f;
 
         frameTimesMs = new double[Math.Max(MeasureFrames, 0)];
     }

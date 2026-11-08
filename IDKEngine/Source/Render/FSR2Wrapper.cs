@@ -10,7 +10,7 @@ namespace IDKEngine.Render;
 
 class FSR2Wrapper : IDisposable
 {
-    public static readonly bool IS_SUPPORTED = OperatingSystem.IsWindows();
+    public static readonly bool IS_SUPPORTED = NativeLibrary.TryLoad("ffx_fsr2_api_x64", typeof(FSR2).Assembly, null, out _);
 
     public bool IsSharpening;
     public float Sharpness;

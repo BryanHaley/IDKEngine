@@ -581,6 +581,15 @@ class Application : GameWindowBase
         {
             RasterizerPipeline.TakeMeshShaderPath = benchmark.MeshCamera;
             CpuPointShadow.TakeMeshShaderPath = benchmark.MeshShadow;
+
+            if (Enum.TryParse(benchmark.AntiAliasing, out RasterPipeline.AntiAliasingMode aa))
+            {
+                RasterizerPipeline.AntiAliasingMode_ = aa;
+            }
+            if (benchmark.RenderScale > 0.0f)
+            {
+                RequestRenderResolutionScale = benchmark.RenderScale;
+            }
         }
         if (benchmark != null && benchmark.PathTracer)
         {
