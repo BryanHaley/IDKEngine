@@ -10,7 +10,7 @@ namespace IDKEngine.Render;
 
 class FSR2Wrapper : IDisposable
 {
-    public static readonly bool IS_SUPPORTED = NativeLibrary.TryLoad("ffx_fsr2_api_x64", typeof(FSR2).Assembly, null, out _);
+    public static readonly bool IS_SUPPORTED = LibraryLoads();
 
     public bool IsSharpening;
     public float Sharpness;
@@ -101,6 +101,19 @@ class FSR2Wrapper : IDisposable
         fsr2ScratchMemory.Dispose();
 
         Result.Dispose();
+    }
+
+    private static bool LibraryLoads()
+    {
+        try
+        {
+            FSR2.GetJitterPhaseCount(1, 1);
+            return true;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
     }
 
     public static int GetRecommendedSampleCount(int renderWidth, int displayWith)

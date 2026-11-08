@@ -133,6 +133,10 @@ abstract unsafe class GameWindowBase : IDisposable
             Environment.Exit(0);
         }
 
+        // on a Retina screen the framebuffer is bigger than the window, and
+        // GLFW only reports it through the callback once the size changes
+        GLFW.GetFramebufferSize(window, out _framebufferSize.X, out _framebufferSize.Y);
+
         framebufferSizeFuncPtr = FramebufferSizeCallback;
         GLFW.SetFramebufferSizeCallback(window, framebufferSizeFuncPtr);
 
